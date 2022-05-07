@@ -10,11 +10,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/djherbis/times"
 )
 
 type FilePath struct {
 	Path     string
 	FullPath string
+}
+
+type CacheStats struct {
+	BytesServedFromCache  int
+	BytesServedFromOrigin int
 }
 
 type Cache struct {
@@ -23,6 +30,7 @@ type Cache struct {
 	TimeToLive time.Duration
 	ApiKey     string
 	UserAgent  string
+	Stats      CacheStats
 }
 
 func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey string, userAgent string) (Cache, error) {
@@ -40,14 +48,32 @@ func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey 
 
 	routeString := strings.Join(route, "/")
 
+	go c.removeOutdatedTiles()
+
 	http.HandleFunc("/"+routeString+"/", c.serve)
 	fmt.Println("New Cache initialized on route /" + routeString + "/")
 
 	return c, nil
 }
 
+func (c *Cache) LogStats() {
+	cachePercentage := "0"
+	originPercentage := "0"
+
+	if c.Stats.BytesServedFromCache+c.Stats.BytesServedFromOrigin > 0 {
+		cachePercentage = fmt.Sprintf("%.2f", 100*float64(c.Stats.BytesServedFromCache)/float64(c.Stats.BytesServedFromCache+c.Stats.BytesServedFromOrigin))
+		originPercentage = fmt.Sprintf("%.2f", 100*float64(c.Stats.BytesServedFromOrigin)/float64(c.Stats.BytesServedFromCache+c.Stats.BytesServedFromOrigin))
+	}
+
+	log("Served from Cache: " + strconv.Itoa(c.Stats.BytesServedFromCache) + " Bytes (" + cachePercentage + "%), Served from Origin: " + strconv.Itoa(c.Stats.BytesServedFromOrigin) + " Bytes (" + originPercentage + "%)")
+}
+
 func log(message string) {
 	fmt.Println(message)
+}
+
+func (c *Cache) removeOutdatedTiles() {
+	log("Cleaning cache...")
 }
 
 func (c *Cache) request(x string, y string, z string, s string) ([]byte, error) {
@@ -65,6 +91,7 @@ func (c *Cache) request(x string, y string, z string, s string) ([]byte, error) 
 		return nil, err
 	}
 
+	//TODO: forward all headers from original request
 	req.Header.Set("Accept", "*/*")
 	//req.Header.Set("Accept-Encoding", "*")
 
@@ -120,7 +147,30 @@ func (c *Cache) makeFilepath(x string, y string, z string) FilePath {
 
 func (c *Cache) load(x string, y string, z string) ([]byte, error) {
 	fp := c.makeFilepath(x, y, z)
-	return ioutil.ReadFile(fp.FullPath)
+	data, err := ioutil.ReadFile(fp.FullPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, errors.New("File empty!")
+	}
+
+	t, err := times.Stat(fp.FullPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	log("ctime for " + fp.FullPath + ": " + t.ModTime().String())
+
+	age := time.Now().Sub(t.ModTime())
+	if age > c.TimeToLive {
+		return nil, errors.New("Tile is too old!")
+	}
+
+	return data, nil
 }
 
 func (c *Cache) save(x string, y string, z string, data *[]byte) error {
@@ -167,8 +217,9 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 
 	data, err := c.load(x, y, z)
 
-	if err != nil || len(data) == 0 {
-		log("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] not found locally. Sending request to server...")
+	if err != nil {
+		log("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
+		log("Sending request to server...")
 
 		data, err = c.request(x, y, z, s)
 
@@ -178,11 +229,15 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 			w.Write([]byte("Not found"))
 			return
 		} else {
-			log("Fetched tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from server!")
+			log("Fetched tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from server (" + strconv.Itoa(len(data)) + " Bytes)!")
+			c.Stats.BytesServedFromOrigin += len(data)
 		}
 	} else {
-		log("Loaded tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from cache!")
+		log("Loaded tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from cache (" + strconv.Itoa(len(data)) + " Bytes)!")
+		c.Stats.BytesServedFromCache += len(data)
 	}
+
+	c.LogStats()
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")

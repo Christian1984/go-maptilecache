@@ -10,22 +10,33 @@ import (
 
 func testRequest() {
 	//http.Get("http://localhost:9001/maptilecache/test/a/6/10/10/")
-	http.Get("http://localhost:9001/maptilecache/osm/a/6/11/11/")
+
+	/*for i := 0; i < 100; i++ {
+		x := strconv.Itoa(rand.Intn(5))
+		y := strconv.Itoa(rand.Intn(5))
+		z := strconv.Itoa(rand.Intn(4) + 3)
+
+		http.Get("http://localhost:9001/maptilecache/osm/a/" + z + "/" + y + "/" + x + "/")
+
+		time.Sleep(1 * time.Second)
+	}*/
 }
 
 func main() {
 	httpListen := "0.0.0.0:9001"
-	cache.New([]string{"maptilecache", "test"}, "http://localhost:9001/test/", 1*time.Hour, "", "go-maptilecache-test")
-	cache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 1*time.Hour, "", "go-maptilecache-osm")
+	cache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 30*24*time.Hour, "", "go-maptilecache-osm")
 
-	fmt.Println("Map Tile Cache listening at " + httpListen)
-
-	http.HandleFunc("/test/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(r.Header)
-		w.Write([]byte("Done"))
-	})
+	/*
+		http.HandleFunc("/test/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println(r.Header)
+			w.Write([]byte("Done"))
+		})
+		cache.New([]string{"maptilecache", "test"}, "http://localhost:9001/test/", 20*time.Second, "", "go-maptilecache-test")
+	*/
 
 	go http.ListenAndServe(httpListen, nil)
+	fmt.Println("Map Tile Cache listening at " + httpListen)
+
 	time.Sleep(1 * time.Second)
 	testRequest()
 
