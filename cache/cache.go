@@ -90,7 +90,6 @@ func (c *Cache) request(x string, y string, z string, s string, sourceHost strin
 	}
 
 	req.Header = *sourceHeader
-	//req.Host = sourceHost
 
 	log("Headers:")
 	fmt.Println(req.Header)

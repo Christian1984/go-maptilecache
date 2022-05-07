@@ -58,7 +58,7 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 	testOne()
-	testMany(20)
+	//testMany(20)
 
 	fmt.Println("Press Enter Key to quit")
 	fmt.Scanln()
