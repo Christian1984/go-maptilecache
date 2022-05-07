@@ -29,17 +29,15 @@ type Cache struct {
 	UrlScheme  string
 	TimeToLive time.Duration
 	ApiKey     string
-	UserAgent  string
 	Stats      CacheStats
 }
 
-func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey string, userAgent string) (Cache, error) {
+func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
 	c := Cache{
 		Route:      route,
 		UrlScheme:  urlScheme,
 		TimeToLive: TimeToLiveDays,
 		ApiKey:     apiKey,
-		UserAgent:  userAgent,
 	}
 
 	if len(route) < 1 {
@@ -76,7 +74,7 @@ func (c *Cache) removeOutdatedTiles() {
 	log("Cleaning cache...")
 }
 
-func (c *Cache) request(x string, y string, z string, s string) ([]byte, error) {
+func (c *Cache) request(x string, y string, z string, s string, sourceHost string, sourceHeader *http.Header) ([]byte, error) {
 	url := c.UrlScheme
 	url = strings.Replace(url, "{s}", s, 1)
 	url = strings.Replace(url, "{x}", x, 1)
@@ -91,15 +89,12 @@ func (c *Cache) request(x string, y string, z string, s string) ([]byte, error) 
 		return nil, err
 	}
 
-	//TODO: forward all headers from original request
-	req.Header.Set("Accept", "*/*")
-	//req.Header.Set("Accept-Encoding", "*")
+	req.Header = *sourceHeader
+	//req.Host = sourceHost
 
-	if c.UserAgent != "" {
-		req.Header.Set("User-Agent", c.UserAgent)
-	}
+	log("Headers:")
+	fmt.Println(req.Header)
 
-	//req.Host = "a.tile.openstreetmap.org"
 	client := &http.Client{}
 	resp, err := client.Do(req)
 
@@ -221,7 +216,10 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		log("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
 		log("Sending request to server...")
 
-		data, err = c.request(x, y, z, s)
+		sourceHost := req.Host
+		sourceHeader := req.Header.Clone()
+
+		data, err = c.request(x, y, z, s, sourceHost, &sourceHeader)
 
 		if err != nil {
 			log("Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")
