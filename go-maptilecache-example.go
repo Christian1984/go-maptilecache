@@ -43,7 +43,7 @@ func testMany(n int) {
 
 func main() {
 	httpListen := "0.0.0.0:9001"
-	cache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 30*24*time.Hour, "")
+	cache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 
 	/*
 		http.HandleFunc("/test/", func(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +57,7 @@ func main() {
 	fmt.Println("Map Tile Cache listening at " + httpListen)
 
 	time.Sleep(1 * time.Second)
-	testOne()
+	//testOne()
 	//testMany(20)
 
 	fmt.Println("Press Enter Key to quit")

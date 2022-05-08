@@ -29,16 +29,16 @@
             }
         };
 
-        const map_resolution = map_resolutions.high;
+        const map_resolution = map_resolutions.low;
 
-        const osm = new L.TileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        /*const osm = new L.TileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 18,
             minZoom: 2,
             tileSize: map_resolution.tile_size,
             zoomOffset: map_resolution.zoom_offset,
             format: "image/png",
             subdomains: ["a", "b", "c"]
-        });
+        });*/
 
         const osmc = new L.TileLayer("http://localhost:9001/maptilecache/osm/{s}/{z}/{y}/{x}/", {
             maxZoom: 18,
@@ -50,14 +50,14 @@
         });
         
         const map = new L.Map("map", {
-            layers: [ osm ],
+            layers: [ osmc ],
             center: [51.505, -0.09],
             zoom: 10,
             attributionControl: false
         });
 
         const baseMaps = {
-            "OSM": osm,
+            //"OSM": osm,
             "OSM Cached": osmc
         };
 

@@ -70,8 +70,42 @@ func log(message string) {
 	fmt.Println(message)
 }
 
+func (c *Cache) isFileOutdated(modtime time.Time) bool {
+	age := time.Now().Sub(modtime)
+	return age > c.TimeToLive
+}
+
 func (c *Cache) removeOutdatedTiles() {
 	log("Cleaning cache...")
+
+	root := filepath.Join(append([]string{"."}, c.Route...)...)
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			infoString := fmt.Sprintf("Inspecting file [%s] => size: %d Bytes, moddate: %s", root, info.Size(), info.ModTime().String())
+			log(infoString)
+
+			if c.isFileOutdated(info.ModTime()) {
+				log(path + " is outdated. Removing file from cache...")
+				removeErr := os.Remove(path)
+
+				if removeErr != nil {
+					log("Could not remove " + path)
+					return nil
+				}
+
+				log("Removed file " + path)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log("Could not clean cache, reason: " + err.Error())
+		return
+	}
+
+	log("Cache cleaned!")
 }
 
 func (c *Cache) request(x string, y string, z string, s string, sourceHost string, sourceHeader *http.Header) ([]byte, error) {
@@ -157,10 +191,9 @@ func (c *Cache) load(x string, y string, z string) ([]byte, error) {
 		return nil, err
 	}
 
-	log("ctime for " + fp.FullPath + ": " + t.ModTime().String())
+	log("modtime for " + fp.FullPath + ": " + t.ModTime().String())
 
-	age := time.Now().Sub(t.ModTime())
-	if age > c.TimeToLive {
+	if c.isFileOutdated(t.ModTime()) {
 		return nil, errors.New("Tile is too old!")
 	}
 
