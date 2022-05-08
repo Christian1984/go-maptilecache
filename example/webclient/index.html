@@ -37,15 +37,6 @@
 
         const map_resolution = map_resolutions.high;
 
-        /*const osm = new L.TileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 18,
-            minZoom: 2,
-            tileSize: map_resolution.tile_size,
-            zoomOffset: map_resolution.zoom_offset,
-            format: "image/png",
-            subdomains: ["a", "b", "c"]
-        });*/
-
         const osmc = new L.TileLayer("http://localhost:9001/maptilecache/osm/{s}/{z}/{y}/{x}/", {
             maxZoom: 18,
             minZoom: 2,
@@ -53,6 +44,39 @@
             zoomOffset: map_resolution.zoom_offset,
             format: "image/png",
             subdomains: ["a", "b", "c"]
+        });
+
+        const otmc = new L.TileLayer("http://localhost:9001/maptilecache/otm/{s}/{z}/{y}/{x}/", {
+            maxZoom: 18,
+            minZoom: 2,
+            tileSize: map_resolution.tile_size,
+            zoomOffset: map_resolution.zoom_offset,
+            format: "image/png",
+            subdomains: ["a", "b", "c"]
+        });
+
+        const oaip = new L.TileLayer("http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", {
+            maxZoom: 14,
+            minZoom: 4,
+            tileSize: map_resolution.tile_size,
+            zoomOffset: map_resolution.zoom_offset,
+            tms: true,
+            //detectRetina: true,
+            subdomains: "12",
+            format: "image/png",
+            transparent: true
+        });
+
+        const oaipc = new L.TileLayer("http://localhost:9001/maptilecache/oaip/{s}/{z}/{y}/{x}/", {
+            maxZoom: 14,
+            minZoom: 4,
+            tileSize: map_resolution.tile_size,
+            zoomOffset: map_resolution.zoom_offset,
+            tms: true,
+            //detectRetina: true,
+            subdomains: "12",
+            format: "image/png",
+            transparent: true
         });
         
         const map = new L.Map("map", {
@@ -64,10 +88,16 @@
 
         const baseMaps = {
             //"OSM": osm,
-            "OSM Cached": osmc
+            "OSM Cached": osmc,
+            "OTM Cached": otmc
         };
 
-        L.control.layers(baseMaps).addTo(map);
+        const overlayMaps = {
+            "openAIP": oaip,
+            "openAIP Cached": oaipc
+        };
+
+        L.control.layers(baseMaps, overlayMaps).addTo(map);
     </script>
 </body>
 </html>
