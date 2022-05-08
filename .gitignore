@@ -15,7 +15,7 @@ go-maptilecache
 
 # Dependency directories (remove the comment below to include it)
 vendor/
-maptilecache/
+example/cache/maptilecache/
 
 # Go workspace file
 go.work

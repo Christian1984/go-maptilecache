@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Christian1984/go-maptilecache/cache"
+	"github.com/Christian1984/go-maptilecache"
 )
 
 func sendTestRequest(url string) {
@@ -43,7 +43,7 @@ func testMany(n int) {
 
 func main() {
 	httpListen := "0.0.0.0:9001"
-	cache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
+	maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 
 	/*
 		http.HandleFunc("/test/", func(w http.ResponseWriter, r *http.Request) {
