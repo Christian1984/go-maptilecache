@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -71,10 +72,16 @@ func (c *Cache) removeOutdatedTiles() {
 		return
 	}
 
+	var totalSize int64 = 0
+	var removedFilesSize int64 = 0
+
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
-			infoString := fmt.Sprintf("Inspecting file [%s] => size: %d Bytes, modtime: %s", path, info.Size(), info.ModTime().String())
+			size := info.Size()
+			infoString := fmt.Sprintf("Inspecting file [%s] => size: %d Bytes, modtime: %s", path, size, info.ModTime().String())
 			c.logDebug(infoString)
+
+			totalSize += size
 
 			if c.isFileOutdated(info.ModTime()) {
 				c.logDebug("[" + path + "] is outdated. Removing file from cache...")
@@ -84,6 +91,8 @@ func (c *Cache) removeOutdatedTiles() {
 					c.logWarn("Could not remove [" + path + "]")
 					return nil
 				}
+
+				removedFilesSize += size
 
 				c.logDebug("Removed file [" + path + "]")
 			} else {
@@ -99,15 +108,17 @@ func (c *Cache) removeOutdatedTiles() {
 		return
 	}
 
-	c.logInfo("Cache cleaned!")
+	c.logInfo(fmt.Sprintf("Cache cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed)", totalSize, totalSize-removedFilesSize, removedFilesSize))
 }
 
-func (c *Cache) request(x string, y string, z string, s string, sourceHost string, sourceHeader *http.Header) ([]byte, error) {
+func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
 	url := c.UrlScheme
 	url = strings.Replace(url, "{s}", s, 1)
 	url = strings.Replace(url, "{x}", x, 1)
 	url = strings.Replace(url, "{y}", y, 1)
 	url = strings.Replace(url, "{z}", z, 1)
+
+	//TODO: process query params and apiKey
 
 	c.logDebug("Requesting tile from " + url)
 
@@ -219,21 +230,24 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	// route format: /{route}/{s}/{z}/{y}/{x}/
 	c.logDebug("Received request with RequestURI: [" + req.RequestURI + "]")
 
-	requestUri := strings.Split(req.RequestURI, "/")
+	requestPath := strings.Split(req.URL.Path, "/")
 
-	if len(requestUri) < 5+len(c.Route) {
+	if len(requestPath) < 5+len(c.Route) {
 		c.logError("Bad Request: Not enough arguments in route [" + req.RequestURI + "]")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Bad Request"))
 		return
 	}
 
-	s := requestUri[1+len(c.Route)]
-	z := requestUri[2+len(c.Route)]
-	y := requestUri[3+len(c.Route)]
-	x := requestUri[4+len(c.Route)]
+	s := requestPath[1+len(c.Route)]
+	z := requestPath[2+len(c.Route)]
+	y := requestPath[3+len(c.Route)]
+	x := requestPath[4+len(c.Route)]
 
-	c.logDebug("Params found: s=[" + s + "], x=[" + x + "], y=[" + y + "], z=[" + z + "]")
+	c.logDebug("Params found in route: s=[" + s + "], x=[" + x + "], y=[" + y + "], z=[" + z + "]")
+
+	params := req.URL.Query()
+	c.logDebug("Request params found : " + fmt.Sprint(params))
 
 	data, err := c.load(x, y, z)
 
@@ -241,10 +255,9 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
 		c.logDebug("Sending request to server...")
 
-		sourceHost := req.Host
 		sourceHeader := req.Header.Clone()
 
-		data, err = c.request(x, y, z, s, sourceHost, &sourceHeader)
+		data, err = c.request(x, y, z, s, &params, &sourceHeader)
 
 		if err != nil {
 			c.logWarn("Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")

@@ -29,6 +29,10 @@ func testOne() {
 	sendTestRequest("http://localhost:9001/maptilecache/osm/a/6/10/10/")
 }
 
+func testOneWithParams() {
+	sendTestRequest("http://localhost:9001/maptilecache/osm/a/6/10/10/?test=ok")
+}
+
 func testMany(n int) {
 	for i := 0; i < n; i++ {
 		x := strconv.Itoa(rand.Intn(5))
@@ -61,7 +65,8 @@ func main() {
 	fmt.Println("Map Tile Cache listening at " + httpListen)
 
 	time.Sleep(1 * time.Second)
-	//testOne()
+	testOne()
+	testOneWithParams()
 	//testMany(20)
 
 	fmt.Println("Press Enter Key to quit")
