@@ -30,6 +30,7 @@ type Cache struct {
 	TimeToLive time.Duration
 	ApiKey     string
 	Stats      CacheStats
+	Logger     LoggerConfig
 }
 
 func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
@@ -38,6 +39,7 @@ func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey 
 		UrlScheme:  urlScheme,
 		TimeToLive: TimeToLiveDays,
 		ApiKey:     apiKey,
+		Logger:     LoggerConfig{LogPrefix: "Cache[" + strings.Join(route, "/") + "]"},
 	}
 
 	if len(route) < 1 {
@@ -54,52 +56,38 @@ func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey 
 	return c, nil
 }
 
-func (c *Cache) LogStats() {
-	cachePercentage := "0"
-	originPercentage := "0"
-
-	if c.Stats.BytesServedFromCache+c.Stats.BytesServedFromOrigin > 0 {
-		cachePercentage = fmt.Sprintf("%.2f", 100*float64(c.Stats.BytesServedFromCache)/float64(c.Stats.BytesServedFromCache+c.Stats.BytesServedFromOrigin))
-		originPercentage = fmt.Sprintf("%.2f", 100*float64(c.Stats.BytesServedFromOrigin)/float64(c.Stats.BytesServedFromCache+c.Stats.BytesServedFromOrigin))
-	}
-
-	log("Served from Cache: " + strconv.Itoa(c.Stats.BytesServedFromCache) + " Bytes (" + cachePercentage + "%), Served from Origin: " + strconv.Itoa(c.Stats.BytesServedFromOrigin) + " Bytes (" + originPercentage + "%)")
-}
-
-func log(message string) {
-	fmt.Println(message)
-}
-
 func (c *Cache) isFileOutdated(modtime time.Time) bool {
 	age := time.Now().Sub(modtime)
 	return age > c.TimeToLive
 }
 
 func (c *Cache) removeOutdatedTiles() {
-	log("Cleaning cache...")
+	c.logInfo("Cleaning cache...")
 
 	root := filepath.Join(append([]string{"."}, c.Route...)...)
 
 	if _, statErr := os.Stat(root); statErr != nil {
-		log("Cache directory not yet initialized. Aborting cleanup!")
+		c.logInfo("Cache directory not yet initialized. Aborting cleanup!")
 		return
 	}
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
-			infoString := fmt.Sprintf("Inspecting file [%s] => size: %d Bytes, moddate: %s", root, info.Size(), info.ModTime().String())
-			log(infoString)
+			infoString := fmt.Sprintf("Inspecting file [%s] => size: %d Bytes, modtime: %s", path, info.Size(), info.ModTime().String())
+			c.logDebug(infoString)
 
 			if c.isFileOutdated(info.ModTime()) {
-				log(path + " is outdated. Removing file from cache...")
+				c.logDebug("[" + path + "] is outdated. Removing file from cache...")
 				removeErr := os.Remove(path)
 
 				if removeErr != nil {
-					log("Could not remove " + path)
+					c.logWarn("Could not remove [" + path + "]")
 					return nil
 				}
 
-				log("Removed file " + path)
+				c.logDebug("Removed file [" + path + "]")
+			} else {
+				c.logDebug("File [" + path + "] is current.")
 			}
 		}
 
@@ -107,11 +95,11 @@ func (c *Cache) removeOutdatedTiles() {
 	})
 
 	if err != nil {
-		log("Could not clean cache, reason: " + err.Error())
+		c.logWarn("Could not clean cache, reason: " + err.Error())
 		return
 	}
 
-	log("Cache cleaned!")
+	c.logInfo("Cache cleaned!")
 }
 
 func (c *Cache) request(x string, y string, z string, s string, sourceHost string, sourceHeader *http.Header) ([]byte, error) {
@@ -121,44 +109,43 @@ func (c *Cache) request(x string, y string, z string, s string, sourceHost strin
 	url = strings.Replace(url, "{y}", y, 1)
 	url = strings.Replace(url, "{z}", z, 1)
 
-	log("Requesting tile from " + url)
+	c.logDebug("Requesting tile from " + url)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log("Could not create request, reason: " + err.Error())
+		c.logError("Could not create request, reason: " + err.Error())
 		return nil, err
 	}
 
 	req.Header = *sourceHeader
 
-	log("Headers:")
-	fmt.Println(req.Header)
+	c.logDebug(fmt.Sprintf("Request Headers: %s", req.Header))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log("Could not request tile, reason: " + err.Error())
+		c.logError("Could not request tile, reason: " + err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log("Could not request tile, bad status code: " + strconv.Itoa(resp.StatusCode))
+		c.logError("Could not request tile, bad status code: " + strconv.Itoa(resp.StatusCode))
 		return nil, err
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		log("Could parse response body, reason: " + err.Error())
+		c.logError("Could parse response body, reason: " + err.Error())
 		return nil, err
 	}
 
-	log("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
+	c.logInfo("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
 
 	if len(bodyBytes) == 0 {
-		log("Invalid response body, reason: size == 0 Bytes")
+		c.logError("Invalid response body, reason: size == 0 Bytes")
 		return nil, errors.New("Invalid response body")
 	}
 
@@ -197,7 +184,7 @@ func (c *Cache) load(x string, y string, z string) ([]byte, error) {
 		return nil, err
 	}
 
-	log("modtime for " + fp.FullPath + ": " + t.ModTime().String())
+	c.logDebug("ModTime for " + fp.FullPath + ": " + t.ModTime().String())
 
 	if c.isFileOutdated(t.ModTime()) {
 		return nil, errors.New("Tile is too old!")
@@ -209,33 +196,33 @@ func (c *Cache) load(x string, y string, z string) ([]byte, error) {
 func (c *Cache) save(x string, y string, z string, data *[]byte) error {
 	fp := c.makeFilepath(x, y, z)
 
-	log("Saving " + strconv.Itoa(len(*data)) + " Bytes to " + fp.FullPath)
+	c.logDebug("Saving " + strconv.Itoa(len(*data)) + " Bytes to " + fp.FullPath)
 
 	dirErr := os.MkdirAll(fp.Path, os.ModePerm)
 
 	if dirErr != nil {
-		log("Could not save tile, reason: " + dirErr.Error())
+		c.logError("Could not save tile, reason: " + dirErr.Error())
 		return dirErr
 	}
 	fileErr := ioutil.WriteFile(fp.FullPath, *data, 0644)
 
 	if fileErr != nil {
-		log("Could not save tile, reason: " + fileErr.Error())
+		c.logError("Could not save tile, reason: " + fileErr.Error())
 		return fileErr
 	}
 
-	log("Tile successfully saved to " + fp.FullPath)
+	c.logDebug("Tile successfully saved to " + fp.FullPath)
 	return nil
 }
 
 func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	// route format: /{route}/{s}/{z}/{y}/{x}/
-	log("Received request with RequestURI: [" + req.RequestURI + "]")
+	c.logDebug("Received request with RequestURI: [" + req.RequestURI + "]")
 
 	requestUri := strings.Split(req.RequestURI, "/")
 
 	if len(requestUri) < 5+len(c.Route) {
-		log("Bad Request: Not enough arguments in route [" + req.RequestURI + "]")
+		c.logError("Bad Request: Not enough arguments in route [" + req.RequestURI + "]")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Bad Request"))
 		return
@@ -246,13 +233,13 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	y := requestUri[3+len(c.Route)]
 	x := requestUri[4+len(c.Route)]
 
-	log("Params found: s=[" + s + "], x=[" + x + "], y=[" + y + "], z=[" + z + "]")
+	c.logDebug("Params found: s=[" + s + "], x=[" + x + "], y=[" + y + "], z=[" + z + "]")
 
 	data, err := c.load(x, y, z)
 
 	if err != nil {
-		log("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
-		log("Sending request to server...")
+		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
+		c.logDebug("Sending request to server...")
 
 		sourceHost := req.Host
 		sourceHeader := req.Header.Clone()
@@ -260,16 +247,16 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		data, err = c.request(x, y, z, s, sourceHost, &sourceHeader)
 
 		if err != nil {
-			log("Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")
+			c.logWarn("Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("Not found"))
 			return
 		} else {
-			log("Fetched tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from server (" + strconv.Itoa(len(data)) + " Bytes)!")
+			c.logDebug("Fetched tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from server (" + strconv.Itoa(len(data)) + " Bytes)!")
 			c.Stats.BytesServedFromOrigin += len(data)
 		}
 	} else {
-		log("Loaded tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from cache (" + strconv.Itoa(len(data)) + " Bytes)!")
+		c.logDebug("Loaded tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from cache (" + strconv.Itoa(len(data)) + " Bytes)!")
 		c.Stats.BytesServedFromCache += len(data)
 	}
 

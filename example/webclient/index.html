@@ -7,9 +7,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"></script>
     <title>go-maptilecache-webclient</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
 </head>
 <body>
-    <div id="map" style="height: 300px;"></div>
+    <div id="map" style="height: 100vh;"></div>
     <script>
         const map_resolutions = {
             high: {
