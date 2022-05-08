@@ -1,6 +1,6 @@
 # From https://github.com/github/gitignore/blob/main/Go.gitignore
 # Binaries for programs and plugins
-go-maptilecache
+cache
 *.exe
 *.exe~
 *.dll
@@ -15,6 +15,8 @@ go-maptilecache
 
 # Dependency directories (remove the comment below to include it)
 vendor/
+
+# Example cache data
 example/cache/maptilecache/
 
 # Go workspace file
