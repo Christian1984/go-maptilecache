@@ -45,6 +45,14 @@ func testMany(n int) {
 	}
 }
 
+func initTestEndpoint() {
+	http.HandleFunc("/test/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println(r.Header)
+		w.Write([]byte("Done"))
+	})
+	maptilecache.New([]string{"maptilecache", "test"}, "http://localhost:9001/test/", 20*time.Second, "")
+}
+
 func main() {
 	httpListen := "0.0.0.0:9001"
 
@@ -53,20 +61,12 @@ func main() {
 
 	maptilecache.New([]string{"maptilecache", "oaip"}, "http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 
-	/*
-		http.HandleFunc("/test/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Println(r.Header)
-			w.Write([]byte("Done"))
-		})
-		cache.New([]string{"maptilecache", "test"}, "http://localhost:9001/test/", 20*time.Second, "")
-	*/
-
 	go http.ListenAndServe(httpListen, nil)
 	fmt.Println("Map Tile Cache listening at " + httpListen)
 
 	time.Sleep(1 * time.Second)
-	testOne()
-	testOneWithParams()
+	//testOne()
+	//testOneWithParams()
 	//testMany(20)
 
 	fmt.Println("Press Enter Key to quit")

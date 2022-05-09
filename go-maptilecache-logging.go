@@ -5,48 +5,40 @@ import (
 	"strconv"
 )
 
+// configure Log*Func with external callbacks to route log
+// message to an existing logger of the embedding application
 type LoggerConfig struct {
 	LogPrefix    string
-	LogDebugFunc func(string, bool)
-	LogInfoFunc  func(string, bool)
-	LogWarnFunc  func(string, bool)
-	LogErrorFunc func(string, bool)
+	LogDebugFunc func(string)
+	LogInfoFunc  func(string)
+	LogWarnFunc  func(string)
+	LogErrorFunc func(string)
+}
+
+func (c *Cache) log(level string, message string, logFunc func(string)) {
+	msg := c.Logger.LogPrefix + ": " + message
+	if logFunc != nil {
+		logFunc(msg)
+	} else {
+		fmt.Println("[" + level + "] " + msg)
+	}
+
 }
 
 func (c *Cache) logDebug(message string) {
-	msg := c.Logger.LogPrefix + ": " + message
-	if c.Logger.LogDebugFunc != nil {
-		c.Logger.LogDebugFunc(msg, false)
-	} else {
-		fmt.Println("[DEBUG] " + msg)
-	}
+	c.log("DEBUG", message, c.Logger.LogDebugFunc)
 }
 
 func (c *Cache) logInfo(message string) {
-	msg := c.Logger.LogPrefix + ": " + message
-	if c.Logger.LogDebugFunc != nil {
-		c.Logger.LogDebugFunc(msg, false)
-	} else {
-		fmt.Println("[INFO] " + msg)
-	}
+	c.log("INFO", message, c.Logger.LogInfoFunc)
 }
 
 func (c *Cache) logWarn(message string) {
-	msg := c.Logger.LogPrefix + ": " + message
-	if c.Logger.LogDebugFunc != nil {
-		c.Logger.LogDebugFunc(msg, false)
-	} else {
-		fmt.Println("[WARN] " + msg)
-	}
+	c.log("WARN", message, c.Logger.LogWarnFunc)
 }
 
 func (c *Cache) logError(message string) {
-	msg := c.Logger.LogPrefix + ": " + message
-	if c.Logger.LogDebugFunc != nil {
-		c.Logger.LogDebugFunc(msg, false)
-	} else {
-		fmt.Println("[ERROR] " + msg)
-	}
+	c.log("ERROR", message, c.Logger.LogErrorFunc)
 }
 
 func (c *Cache) LogStats() {
