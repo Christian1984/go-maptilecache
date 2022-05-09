@@ -1,6 +1,6 @@
 This project is a simple, open source map tile cache written go and licensed under the MIT license.
 
-Upon receiving a map tile request the cache will check for cached map tiles and evaluate its age against a previously configured "Time to Live".
+Upon receiving a map tile request the cache checks for cached map tiles and evaluates its age against a previously configured "Time to Live".
 
 - If the tile exists and is still current it will be served directly from the cache.
 - Otherwise it will be fetched from the remote server of the map tile provider, served to the client while the cache will be updated accordingly.
@@ -52,11 +52,8 @@ import (
 )
 
 func main() {
-    httpListen := "0.0.0.0:9001"
-
     maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
-
-    http.ListenAndServe(httpListen, nil)
+    http.ListenAndServe("0.0.0.0:9001", nil)
 }
 
 ```
