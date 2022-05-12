@@ -34,7 +34,6 @@ type Cache struct {
 	ApiKey          string
 	Stats           CacheStats
 	Logger          LoggerConfig
-	Initialized     bool
 }
 
 func New(route []string, urlScheme string, structureParams []string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
@@ -45,7 +44,6 @@ func New(route []string, urlScheme string, structureParams []string, TimeToLiveD
 		TimeToLive:      TimeToLiveDays,
 		ApiKey:          apiKey,
 		Logger:          LoggerConfig{LogPrefix: "Cache[" + strings.Join(route, "/") + "]"},
-		Initialized:     false,
 	}
 
 	if len(route) < 1 {
@@ -54,24 +52,14 @@ func New(route []string, urlScheme string, structureParams []string, TimeToLiveD
 
 	routeString := strings.Join(route, "/")
 
-	go func() {
-		c.removeOutdatedTiles()
-		http.HandleFunc("/"+routeString+"/", c.serve)
-		fmt.Println("New Cache initialized on route /" + routeString + "/")
-		c.Initialized = true
-	}()
+	http.HandleFunc("/"+routeString+"/", c.serve)
+	fmt.Println("New Cache initialized on route /" + routeString + "/")
 
 	return c, nil
 }
 
 func (c *Cache) WipeCache() error {
 	c.logInfo("Wiping cache...")
-
-	if !c.Initialized {
-		msg := "Cannot wipe cache! Cache not fully initialized"
-		c.logWarn(msg)
-		return errors.New(msg)
-	}
 
 	cacheRoot := filepath.Join(append([]string{"."}, c.Route...)...)
 	if isPathDangerous(cacheRoot) {
@@ -96,8 +84,8 @@ func (c *Cache) isFileOutdated(modtime time.Time) bool {
 	return age > c.TimeToLive
 }
 
-func (c *Cache) removeOutdatedTiles() {
-	c.logInfo("Cleaning cache...")
+func (c *Cache) doValidateCache() {
+	c.logInfo("Validating cache...")
 
 	root := filepath.Join(append([]string{"."}, c.Route...)...)
 
@@ -151,7 +139,15 @@ func (c *Cache) removeOutdatedTiles() {
 		return
 	}
 
-	c.logInfo(fmt.Sprintf("Cache cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed)", totalSize, totalSize-removedFilesSize, removedFilesSize))
+	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed)", totalSize, totalSize-removedFilesSize, removedFilesSize))
+}
+
+func (c *Cache) ValidateCache(async bool) {
+	if async {
+		go c.doValidateCache()
+	} else {
+		c.doValidateCache()
+	}
 }
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
