@@ -74,8 +74,7 @@ func (c *Cache) WipeCache() error {
 	}
 
 	cacheRoot := filepath.Join(append([]string{"."}, c.Route...)...)
-	trimmedRoot := strings.TrimSpace(cacheRoot)
-	if trimmedRoot == "" || trimmedRoot == "/" || trimmedRoot == "C:\\" {
+	if isPathDangerous(cacheRoot) {
 		msg := "Cache could not be wiped, illegal cacheRoot: [" + cacheRoot + "]"
 		c.logError(msg)
 		return errors.New(msg)
@@ -103,7 +102,7 @@ func (c *Cache) removeOutdatedTiles() {
 	root := filepath.Join(append([]string{"."}, c.Route...)...)
 
 	if _, statErr := os.Stat(root); statErr != nil {
-		c.logInfo("Cache directory not yet initialized. Aborting cleanup!")
+		c.logDebug("Cache directory not yet created. Aborting cleanup!")
 		return
 	}
 
@@ -134,7 +133,14 @@ func (c *Cache) removeOutdatedTiles() {
 				c.logDebug("File [" + path + "] is current.")
 			}
 		} else {
-			//TODO: remove empty folder
+			files, err := ioutil.ReadDir(path)
+			if err == nil && len(files) == 0 {
+				err = os.Remove(path)
+
+				if err == nil {
+					c.logDebug("Removed folder [" + path + "]")
+				}
+			}
 		}
 
 		return nil
@@ -239,6 +245,11 @@ func (c *Cache) makeFilepath(requestParams *url.Values, x string, y string, z st
 		Path:     path,
 		FullPath: fullPath,
 	}
+}
+
+func isPathDangerous(path string) bool {
+	trimmedPath := strings.TrimSpace(path)
+	return trimmedPath == "" || trimmedPath == "/" || trimmedPath == "C:\\"
 }
 
 func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
