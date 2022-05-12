@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,21 +27,23 @@ type CacheStats struct {
 }
 
 type Cache struct {
-	Route      []string
-	UrlScheme  string
-	TimeToLive time.Duration
-	ApiKey     string
-	Stats      CacheStats
-	Logger     LoggerConfig
+	Route           []string
+	UrlScheme       string
+	StructureParams []string
+	TimeToLive      time.Duration
+	ApiKey          string
+	Stats           CacheStats
+	Logger          LoggerConfig
 }
 
-func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
+func New(route []string, urlScheme string, structureParams []string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
 	c := Cache{
-		Route:      route,
-		UrlScheme:  urlScheme,
-		TimeToLive: TimeToLiveDays,
-		ApiKey:     apiKey,
-		Logger:     LoggerConfig{LogPrefix: "Cache[" + strings.Join(route, "/") + "]"},
+		Route:           route,
+		UrlScheme:       urlScheme,
+		StructureParams: structureParams,
+		TimeToLive:      TimeToLiveDays,
+		ApiKey:          apiKey,
+		Logger:          LoggerConfig{LogPrefix: "Cache[" + strings.Join(route, "/") + "]"},
 	}
 
 	if len(route) < 1 {
@@ -120,6 +123,8 @@ func (c *Cache) removeOutdatedTiles() {
 			} else {
 				c.logDebug("File [" + path + "] is current.")
 			}
+		} else {
+			//TODO: remove empty folder
 		}
 
 		return nil
@@ -195,14 +200,28 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 		return nil, errors.New("Invalid response body")
 	}
 
-	go c.save(x, y, z, &bodyBytes)
+	go c.save(params, x, y, z, &bodyBytes)
 
 	return bodyBytes, nil
 }
 
-func (c *Cache) makeFilepath(x string, y string, z string) FilePath {
+func (c *Cache) makeFilepath(requestParams *url.Values, x string, y string, z string) FilePath {
 	pathArray := append([]string{"."}, c.Route...)
+
+	var additionalSubfolders []string
+	for _, requiredKey := range c.StructureParams {
+		value := strings.TrimSpace(requestParams.Get(requiredKey))
+
+		if len(value) > 0 {
+			m1 := regexp.MustCompile(`[<>:"\/\\|?*]`)
+			value = m1.ReplaceAllString(value, "-")
+			additionalSubfolders = append(additionalSubfolders, value)
+		}
+	}
+
+	pathArray = append(pathArray, additionalSubfolders...)
 	pathArray = append(pathArray, z, y)
+
 	path := filepath.Join(pathArray...)
 	fullPath := filepath.Join(path, x+".png")
 
@@ -212,8 +231,8 @@ func (c *Cache) makeFilepath(x string, y string, z string) FilePath {
 	}
 }
 
-func (c *Cache) load(x string, y string, z string) ([]byte, error) {
-	fp := c.makeFilepath(x, y, z)
+func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
+	fp := c.makeFilepath(requestParams, x, y, z)
 	data, err := ioutil.ReadFile(fp.FullPath)
 
 	if err != nil {
@@ -239,8 +258,8 @@ func (c *Cache) load(x string, y string, z string) ([]byte, error) {
 	return data, nil
 }
 
-func (c *Cache) save(x string, y string, z string, data *[]byte) error {
-	fp := c.makeFilepath(x, y, z)
+func (c *Cache) save(requestParams *url.Values, x string, y string, z string, data *[]byte) error {
+	fp := c.makeFilepath(requestParams, x, y, z)
 
 	c.logDebug("Saving " + strconv.Itoa(len(*data)) + " Bytes to " + fp.FullPath)
 
@@ -284,7 +303,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	params := req.URL.Query()
 	c.logDebug("Request params found : " + fmt.Sprint(params))
 
-	data, err := c.load(x, y, z)
+	data, err := c.load(&params, x, y, z)
 
 	if err != nil {
 		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())

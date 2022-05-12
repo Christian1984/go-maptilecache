@@ -52,17 +52,52 @@ import (
 )
 
 func main() {
-    maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
+    maptilecache.New(
+        []string{"maptilecache", "osm"},
+        "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        []string{},
+        90*24*time.Hour,
+        "",
+    )
     http.ListenAndServe("0.0.0.0:9001", nil)
 }
 
 ```
 
+# Headers and Request Params
+
+Both headers and request parameters will be forwarded to the server "as is".
+
+# Organizing The Cache With "Params-Based" Subfolders
+
+The constructor parameter `structureParams` allows you to specify parameter keys that are expected by the cache and that can be used to create subfolders inside the cache root directory. As an example, consider openflight maps.
+
+OFM requires client to add a request parameter `path` which identifies the current AIRAC cycle (aviation term). A request url for Leaflet to request tiles from OFM would look like this:
+
+```
+https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=2200/aero/latest
+```
+
+and the corresponding request to the cache would be
+
+```
+http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2200/aero/latest
+```
+
+Now configure your cache like this
+
+```
+maptilecache.New(
+    []string{"maptilecache", "ofm"}, 
+    "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png",
+    []string{"path"},
+    90*24*time.Hour,
+    "",
+)
+```
+
+The cache will forward the `path` param to the server and will organize all locally cached tiles according to the AIRAC cycle. The folder structure would then look like this: `maptilecache/ofm/{AIRAC-cycle}/z/y/x.png`
+
 # Examples
 
 See [here](https://github.com/Christian1984/go-maptilecache/tree/master/example) for examples.
-
-# TODO:
-
-- api key usage is not yet implemented
-- query params are not yet forwarded
