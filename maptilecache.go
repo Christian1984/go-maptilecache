@@ -36,14 +36,28 @@ type Cache struct {
 	Logger          LoggerConfig
 }
 
-func New(route []string, urlScheme string, structureParams []string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
+func NewWithLogger(route []string,
+	urlScheme string,
+	structureParams []string,
+	TimeToLiveDays time.Duration,
+	apiKey string,
+	logDebug func(string),
+	logInfo func(string),
+	logWarn func(string),
+	logError func(string)) (Cache, error) {
 	c := Cache{
 		Route:           route,
 		UrlScheme:       urlScheme,
 		StructureParams: structureParams,
 		TimeToLive:      TimeToLiveDays,
 		ApiKey:          apiKey,
-		Logger:          LoggerConfig{LogPrefix: "Cache[" + strings.Join(route, "/") + "]"},
+		Logger: LoggerConfig{
+			LogPrefix:    "Cache[" + strings.Join(route, "/") + "]",
+			LogDebugFunc: logDebug,
+			LogInfoFunc:  logInfo,
+			LogWarnFunc:  logWarn,
+			LogErrorFunc: logError,
+		},
 	}
 
 	if len(route) < 1 {
@@ -56,6 +70,11 @@ func New(route []string, urlScheme string, structureParams []string, TimeToLiveD
 	fmt.Println("New Cache initialized on route /" + routeString + "/")
 
 	return c, nil
+
+}
+
+func New(route []string, urlScheme string, structureParams []string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
+	return NewWithLogger(route, urlScheme, structureParams, TimeToLiveDays, apiKey, nil, nil, nil, nil)
 }
 
 func (c *Cache) WipeCache() error {

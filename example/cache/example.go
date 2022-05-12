@@ -53,10 +53,14 @@ func initTestEndpoint() {
 	maptilecache.New([]string{"maptilecache", "test"}, "http://localhost:9001/test/", []string{}, 20*time.Second, "")
 }
 
+func testLog(msg string) {
+	fmt.Println("TEST-LOG-FUNCTION: " + msg)
+}
+
 func main() {
 	httpListen := "0.0.0.0:9001"
 
-	osmcache, err := maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, "")
+	osmcache, err := maptilecache.NewWithLogger([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, "", testLog, testLog, testLog, testLog)
 	if err == nil {
 		osmcache.ValidateCache(true)
 	}
