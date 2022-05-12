@@ -49,12 +49,34 @@ func New(route []string, urlScheme string, TimeToLiveDays time.Duration, apiKey 
 
 	routeString := strings.Join(route, "/")
 
-	go c.removeOutdatedTiles()
+	c.removeOutdatedTiles()
 
 	http.HandleFunc("/"+routeString+"/", c.serve)
 	fmt.Println("New Cache initialized on route /" + routeString + "/")
 
 	return c, nil
+}
+
+func (c *Cache) WipeCache() error {
+	c.logInfo("Wiping cache...")
+
+	cacheRoot := filepath.Join(append([]string{"."}, c.Route...)...)
+	trimmedRoot := strings.TrimSpace(cacheRoot)
+	if trimmedRoot == "" || trimmedRoot == "/" || trimmedRoot == "C:\\" {
+		msg := "Cache could not be wiped, illegal cacheRoot: [" + cacheRoot + "]"
+		c.logError(msg)
+		return errors.New(msg)
+	}
+
+	err := os.RemoveAll(cacheRoot)
+
+	if err != nil {
+		c.logWarn("Cache could not be wiped, reason: " + err.Error())
+	} else {
+		c.logInfo("Cache successfully wiped!")
+	}
+
+	return err
 }
 
 func (c *Cache) isFileOutdated(modtime time.Time) bool {
@@ -118,9 +140,10 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	url = strings.Replace(url, "{y}", y, 1)
 	url = strings.Replace(url, "{z}", z, 1)
 
-	//TODO: process query params and apiKey
-
-	c.logDebug("Requesting tile from " + url)
+	if strings.Contains(c.UrlScheme, "{apiKey}") && strings.TrimSpace(c.ApiKey) == "" {
+		c.logWarn("Trying to replace {apiKey}, but ApiKey is not configured!")
+	}
+	url = strings.Replace(url, "{apiKey}", c.ApiKey, 1)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -130,6 +153,18 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 
 	req.Header = *sourceHeader
 
+	query := req.URL.Query()
+	if params != nil {
+		for key, values := range *params {
+			for _, value := range values {
+				query.Add(key, value)
+			}
+		}
+	}
+
+	req.URL.RawQuery = query.Encode()
+
+	c.logDebug("Requesting tile from " + req.URL.RequestURI())
 	c.logDebug(fmt.Sprintf("Request Headers: %s", req.Header))
 
 	client := &http.Client{}
@@ -227,7 +262,7 @@ func (c *Cache) save(x string, y string, z string, data *[]byte) error {
 }
 
 func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
-	// route format: /{route}/{s}/{z}/{y}/{x}/
+	// route format: /{route}/{s}/{z}/{y}/{x}/?params
 	c.logDebug("Received request with RequestURI: [" + req.RequestURI + "]")
 
 	requestPath := strings.Split(req.URL.Path, "/")

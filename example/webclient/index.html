@@ -17,6 +17,34 @@
 <body>
     <div id="map" style="height: 100vh;"></div>
     <script>
+        function calculate_airac_cycle() {
+            const date = new Date();
+            let c_date = new Date(2003, 0, 23);
+            let counter = 0;
+            let last_count = 0;
+            let year = date.getFullYear();
+
+            while (c_date.getTime() < date.getTime()) {
+                if (c_date.getFullYear() === date.getFullYear()-1) {
+                    last_count++;
+                }
+
+                if (c_date.getFullYear() === date.getFullYear()) {
+                    counter++;
+                }
+
+                c_date.setDate(c_date.getDate() + 28);
+            };
+
+            if (counter == 0) {
+                year -= 1;
+                counter = last_count;
+            }
+
+            const airac_id = (parseFloat(year.toString().substring(2, 4)) * 100) + counter;
+            return airac_id.toString();
+        }
+
         const map_resolutions = {
             high: {
                 tile_size: 256,
@@ -55,7 +83,7 @@
             subdomains: ["a", "b", "c"]
         });
 
-        const oaip = new L.TileLayer("http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", {
+        /*const oaip = new L.TileLayer("http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", {
             maxZoom: 14,
             minZoom: 4,
             tileSize: map_resolution.tile_size,
@@ -65,7 +93,7 @@
             subdomains: "12",
             format: "image/png",
             transparent: true
-        });
+        });*/
 
         const oaipc = new L.TileLayer("http://localhost:9001/maptilecache/oaip/{s}/{z}/{y}/{x}/", {
             maxZoom: 14,
@@ -78,10 +106,30 @@
             format: "image/png",
             transparent: true
         });
+
+
+
+        const airac = calculate_airac_cycle();
+
+        /*const ofm = new L.TileLayer("https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=" + airac + "/aero/latest", {
+            maxZoom: 18,
+            minZoom: 2,
+            tileSize: map_resolution.tile_size,
+            zoomOffset: map_resolution.zoom_offset,
+            format: "image/png"
+        });*/
+
+        const ofmc = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=" + airac + "/aero/latest", {
+            maxZoom: 18,
+            minZoom: 2,
+            tileSize: map_resolution.tile_size,
+            zoomOffset: map_resolution.zoom_offset,
+            format: "image/png"
+        });
         
         const map = new L.Map("map", {
             layers: [ osmc ],
-            center: [51.505, -0.09],
+            center: [50, 10],
             zoom: 10,
             attributionControl: false
         });
@@ -93,8 +141,9 @@
         };
 
         const overlayMaps = {
-            "openAIP": oaip,
-            "openAIP Cached": oaipc
+            //"openAIP": oaip,
+            "openAIP Cached": oaipc,
+            "ofm Cached": ofmc
         };
 
         L.control.layers(baseMaps, overlayMaps).addTo(map);

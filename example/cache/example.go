@@ -56,9 +56,11 @@ func initTestEndpoint() {
 func main() {
 	httpListen := "0.0.0.0:9001"
 
-	maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
+	maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?test1=fixed", 1*time.Second, "")
+	//maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 	maptilecache.New([]string{"maptilecache", "otm"}, "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 
+	maptilecache.New([]string{"maptilecache", "ofm"}, "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 	maptilecache.New([]string{"maptilecache", "oaip"}, "http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", 90*24*time.Hour, "")
 
 	go http.ListenAndServe(httpListen, nil)
