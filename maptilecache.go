@@ -34,6 +34,7 @@ type Cache struct {
 	ApiKey          string
 	Stats           CacheStats
 	Logger          LoggerConfig
+	Initialized     bool
 }
 
 func New(route []string, urlScheme string, structureParams []string, TimeToLiveDays time.Duration, apiKey string) (Cache, error) {
@@ -44,6 +45,7 @@ func New(route []string, urlScheme string, structureParams []string, TimeToLiveD
 		TimeToLive:      TimeToLiveDays,
 		ApiKey:          apiKey,
 		Logger:          LoggerConfig{LogPrefix: "Cache[" + strings.Join(route, "/") + "]"},
+		Initialized:     false,
 	}
 
 	if len(route) < 1 {
@@ -52,16 +54,24 @@ func New(route []string, urlScheme string, structureParams []string, TimeToLiveD
 
 	routeString := strings.Join(route, "/")
 
-	c.removeOutdatedTiles()
-
-	http.HandleFunc("/"+routeString+"/", c.serve)
-	fmt.Println("New Cache initialized on route /" + routeString + "/")
+	go func() {
+		c.removeOutdatedTiles()
+		http.HandleFunc("/"+routeString+"/", c.serve)
+		fmt.Println("New Cache initialized on route /" + routeString + "/")
+		c.Initialized = true
+	}()
 
 	return c, nil
 }
 
 func (c *Cache) WipeCache() error {
 	c.logInfo("Wiping cache...")
+
+	if !c.Initialized {
+		msg := "Cannot wipe cache! Cache not fully initialized"
+		c.logWarn(msg)
+		return errors.New(msg)
+	}
 
 	cacheRoot := filepath.Join(append([]string{"."}, c.Route...)...)
 	trimmedRoot := strings.TrimSpace(cacheRoot)
