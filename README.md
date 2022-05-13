@@ -53,11 +53,17 @@ import (
 
 func main() {
     maptilecache.New(
-        []string{"maptilecache", "osm"},
-        "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        []string{},
-        90*24*time.Hour,
-        "",
+        []string{"maptilecache", "osm"},                     // route
+        "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", // provider url
+        []string{},                                          // expected query parameters 
+                                                             // for additional cache organization
+        90*24*time.Hour,                                     // time to live
+        "",                                                  // API key
+        maptilecache.PrintlnDebugLogger,                     // logger callbacks
+        maptilecache.PrintlnInfoLogger,
+        maptilecache.PrintlnWarnLogger,
+        maptilecache.PrintlnErrorLogger,
+        30*time.Second,                                      // delay for stats logging
     )
     http.ListenAndServe("0.0.0.0:9001", nil)
 }
@@ -90,9 +96,8 @@ Now configure your cache like this
 maptilecache.New(
     []string{"maptilecache", "ofm"}, 
     "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png",
-    []string{"path"},
-    90*24*time.Hour,
-    "",
+    []string{"path"}, // <= expected query parameters
+    /* ... */
 )
 ```
 
