@@ -63,7 +63,7 @@ func New(route []string, urlScheme string, structureParams []string,
 	routeString := strings.Join(route, "/")
 
 	http.HandleFunc("/"+routeString+"/", c.serve)
-	fmt.Println("New Cache initialized on route /" + routeString + "/")
+	c.logInfo("New Cache initialized on route /" + routeString + "/")
 
 	return c, nil
 
@@ -216,7 +216,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 		return nil, err
 	}
 
-	c.logInfo("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
+	c.logDebug("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
 
 	if len(bodyBytes) == 0 {
 		c.logError("Invalid response body, reason: size == 0 Bytes")
