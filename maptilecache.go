@@ -39,7 +39,8 @@ type Cache struct {
 func New(route []string, urlScheme string, structureParams []string,
 	TimeToLiveDays time.Duration, apiKey string,
 	debugLogger func(string), infoLogger func(string),
-	warnLogger func(string), errorLogger func(string)) (Cache, error) {
+	warnLogger func(string), errorLogger func(string),
+	statsLogDelay time.Duration) (Cache, error) {
 
 	c := Cache{
 		Route:           route,
@@ -48,11 +49,12 @@ func New(route []string, urlScheme string, structureParams []string,
 		TimeToLive:      TimeToLiveDays,
 		ApiKey:          apiKey,
 		Logger: LoggerConfig{
-			LogPrefix:    "Cache[" + strings.Join(route, "/") + "]",
-			LogDebugFunc: debugLogger,
-			LogInfoFunc:  infoLogger,
-			LogWarnFunc:  warnLogger,
-			LogErrorFunc: errorLogger,
+			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
+			LogDebugFunc:  debugLogger,
+			LogInfoFunc:   infoLogger,
+			LogWarnFunc:   warnLogger,
+			LogErrorFunc:  errorLogger,
+			StatsLogDelay: statsLogDelay,
 		},
 	}
 
@@ -64,6 +66,8 @@ func New(route []string, urlScheme string, structureParams []string,
 
 	http.HandleFunc("/"+routeString+"/", c.serve)
 	c.logInfo("New Cache initialized on route /" + routeString + "/")
+
+	c.InitLogStatsRunner()
 
 	return c, nil
 
@@ -355,7 +359,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		c.Stats.BytesServedFromCache += len(data)
 	}
 
-	c.LogStats()
+	//c.LogStats()
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")

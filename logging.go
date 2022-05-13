@@ -3,16 +3,18 @@ package maptilecache
 import (
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // configure Log*Func with external callbacks to route log
 // message to an existing logger of the embedding application
 type LoggerConfig struct {
-	LogPrefix    string
-	LogDebugFunc func(string)
-	LogInfoFunc  func(string)
-	LogWarnFunc  func(string)
-	LogErrorFunc func(string)
+	LogPrefix     string
+	LogDebugFunc  func(string)
+	LogInfoFunc   func(string)
+	LogWarnFunc   func(string)
+	LogErrorFunc  func(string)
+	StatsLogDelay time.Duration
 }
 
 func (c *Cache) log(message string, logFunc func(string)) {
@@ -70,4 +72,18 @@ func (c *Cache) LogStats() {
 	}
 
 	c.logDebug("Served from Cache: " + strconv.Itoa(c.Stats.BytesServedFromCache) + " Bytes (" + cachePercentage + "%), Served from Origin: " + strconv.Itoa(c.Stats.BytesServedFromOrigin) + " Bytes (" + originPercentage + "%)")
+}
+
+func (c *Cache) InitLogStatsRunner() {
+	if c.Logger.StatsLogDelay == 0 {
+		c.logDebug("Will not log stats periodically, reason: StatsLogDelay not set")
+		return
+	}
+
+	go func() {
+		for {
+			c.LogStats()
+			time.Sleep(c.Logger.StatsLogDelay)
+		}
+	}()
 }
