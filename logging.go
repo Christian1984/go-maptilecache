@@ -15,30 +15,49 @@ type LoggerConfig struct {
 	LogErrorFunc func(string)
 }
 
-func (c *Cache) log(level string, message string, logFunc func(string)) {
-	msg := c.Logger.LogPrefix + ": " + message
+func (c *Cache) log(message string, logFunc func(string)) {
 	if logFunc != nil {
-		logFunc(msg)
-	} else {
-		fmt.Println("[" + level + "] " + msg)
+		logFunc(c.Logger.LogPrefix + ": " + message)
 	}
 
 }
 
+// Default Logger
+func println(level string, message string) {
+	fmt.Println("[" + level + "] " + message)
+}
+
+func PrintlnDebugLogger(message string) {
+	println("DEBUG", message)
+}
+
+func PrintlnInfoLogger(message string) {
+	println("INFO", message)
+}
+
+func PrintlnWarnLogger(message string) {
+	println("WARN", message)
+}
+
+func PrintlnErrorLogger(message string) {
+	println("ERROR", message)
+}
+
+// Log Functions
 func (c *Cache) logDebug(message string) {
-	c.log("DEBUG", message, c.Logger.LogDebugFunc)
+	c.log(message, c.Logger.LogDebugFunc)
 }
 
 func (c *Cache) logInfo(message string) {
-	c.log("INFO", message, c.Logger.LogInfoFunc)
+	c.log(message, c.Logger.LogInfoFunc)
 }
 
 func (c *Cache) logWarn(message string) {
-	c.log("WARN", message, c.Logger.LogWarnFunc)
+	c.log(message, c.Logger.LogWarnFunc)
 }
 
 func (c *Cache) logError(message string) {
-	c.log("ERROR", message, c.Logger.LogErrorFunc)
+	c.log(message, c.Logger.LogErrorFunc)
 }
 
 func (c *Cache) LogStats() {
