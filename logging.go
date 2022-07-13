@@ -4,6 +4,11 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 // configure Log*Func with external callbacks to route log
@@ -62,6 +67,23 @@ func (c *Cache) logError(message string) {
 	c.log(message, c.Logger.LogErrorFunc)
 }
 
+func (c *Cache) LogSystemStats() {
+	v, _ := mem.VirtualMemory()
+	s, _ := mem.SwapMemory()
+	h, _ := host.Info()
+	cpu, _ := cpu.Info()
+	d, _ := disk.Usage("/")
+
+	out := "SYSTEM INFO\n" +
+		"\t" + fmt.Sprintf("Virtual Memory: %s\n", v) +
+		"\t" + fmt.Sprintf("Swap Memory: %s\n", s) +
+		"\t" + fmt.Sprintf("Host: %s\n", h) +
+		"\t" + fmt.Sprintf("CPU: %s\n", cpu) +
+		"\t" + fmt.Sprintf("Disk: %s\n", d) +
+		"\tEND SYSTEM INFO"
+	c.logDebug(out)
+}
+
 func (c *Cache) LogStats() {
 	cachePercentage := "0"
 	originPercentage := "0"
@@ -82,6 +104,7 @@ func (c *Cache) InitLogStatsRunner() {
 
 	go func() {
 		for {
+			c.LogSystemStats()
 			c.LogStats()
 			time.Sleep(c.Logger.StatsLogDelay)
 		}

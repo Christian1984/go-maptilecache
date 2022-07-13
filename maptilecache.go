@@ -41,6 +41,7 @@ func New(route []string, urlScheme string, structureParams []string,
 	debugLogger func(string), infoLogger func(string),
 	warnLogger func(string), errorLogger func(string),
 	statsLogDelay time.Duration) (Cache, error) {
+	start := time.Now()
 
 	c := Cache{
 		Route:           route,
@@ -65,9 +66,11 @@ func New(route []string, urlScheme string, structureParams []string,
 	routeString := strings.Join(route, "/")
 
 	http.HandleFunc("/"+routeString+"/", c.serve)
-	c.logInfo("New Cache initialized on route /" + routeString + "/")
 
 	c.InitLogStatsRunner()
+
+	duration := time.Since(start)
+	c.logInfo("New Cache initialized on route /" + routeString + "/ (took " + duration.String() + ")")
 
 	return c, nil
 
@@ -75,6 +78,8 @@ func New(route []string, urlScheme string, structureParams []string,
 
 func (c *Cache) WipeCache() error {
 	c.logInfo("Wiping cache...")
+
+	start := time.Now()
 
 	cacheRoot := filepath.Join(append([]string{"."}, c.Route...)...)
 	if isPathDangerous(cacheRoot) {
@@ -88,7 +93,8 @@ func (c *Cache) WipeCache() error {
 	if err != nil {
 		c.logWarn("Cache could not be wiped, reason: " + err.Error())
 	} else {
-		c.logInfo("Cache successfully wiped!")
+		duration := time.Since(start)
+		c.logInfo("Cache successfully wiped! (took " + duration.String() + ")")
 	}
 
 	return err
@@ -101,6 +107,8 @@ func (c *Cache) isFileOutdated(modtime time.Time) bool {
 
 func (c *Cache) doValidateCache() {
 	c.logInfo("Validating cache...")
+
+	start := time.Now()
 
 	root := filepath.Join(append([]string{"."}, c.Route...)...)
 
@@ -154,7 +162,8 @@ func (c *Cache) doValidateCache() {
 		return
 	}
 
-	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed)", totalSize, totalSize-removedFilesSize, removedFilesSize))
+	duration := time.Since(start)
+	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
 func (c *Cache) ValidateCache(async bool) {
@@ -166,6 +175,8 @@ func (c *Cache) ValidateCache(async bool) {
 }
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
+	start := time.Now()
+
 	url := c.UrlScheme
 	url = strings.Replace(url, "{s}", s, 1)
 	url = strings.Replace(url, "{x}", x, 1)
@@ -229,6 +240,9 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 
 	go c.save(params, x, y, z, &bodyBytes)
 
+	duration := time.Since(start)
+	c.logDebug("Serving " + strconv.Itoa(len(bodyBytes)) + " Bytes to client (took " + duration.String() + ")")
+
 	return bodyBytes, nil
 }
 
@@ -264,6 +278,8 @@ func isPathDangerous(path string) bool {
 }
 
 func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
+	start := time.Now()
+
 	fp := c.makeFilepath(requestParams, x, y, z)
 	data, err := ioutil.ReadFile(fp.FullPath)
 
@@ -287,10 +303,15 @@ func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([
 		return nil, errors.New("Tile is too old!")
 	}
 
+	duration := time.Since(start)
+	c.logDebug("Loaded tile from " + fp.FullPath + " (took " + duration.String() + ")")
+
 	return data, nil
 }
 
 func (c *Cache) save(requestParams *url.Values, x string, y string, z string, data *[]byte) error {
+	start := time.Now()
+
 	fp := c.makeFilepath(requestParams, x, y, z)
 
 	c.logDebug("Saving " + strconv.Itoa(len(*data)) + " Bytes to " + fp.FullPath)
@@ -308,13 +329,16 @@ func (c *Cache) save(requestParams *url.Values, x string, y string, z string, da
 		return fileErr
 	}
 
-	c.logDebug("Tile successfully saved to " + fp.FullPath)
+	duration := time.Since(start)
+	c.logDebug("Tile with " + strconv.Itoa(len(*data)) + " Bytes successfully saved to " + fp.FullPath + " (took " + duration.String() + ")")
 	return nil
 }
 
 func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	// route format: /{route}/{s}/{z}/{y}/{x}/?params
-	c.logDebug("Received request with RequestURI: [" + req.RequestURI + "]")
+	start := time.Now()
+
+	c.logDebug("Received request with RequestURI [" + req.RequestURI + "]")
 
 	requestPath := strings.Split(req.URL.Path, "/")
 
@@ -367,6 +391,9 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Expires", "0")
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+
+	duration := time.Since(start)
+	c.logDebug("Processing request with RequestURI: [" + req.RequestURI + "] took " + duration.String())
 
 	w.Write(data)
 }
