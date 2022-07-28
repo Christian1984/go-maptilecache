@@ -121,9 +121,9 @@ func (c *Cache) WipeCache() error {
 func (c *Cache) memoryMapRead(key string) ([]byte, bool) {
 	c.MemoryMapMutex.RLock()
 	data, exists := c.MemoryMap[key]
-	c.MemoryMapMutex.RUnlock()
 	fmt.Println("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
 	fmt.Printf("&c.MemoryMapKeyHistory: %p, c.MemoryMapSize: %d\n", &c.MemoryMapKeyHistory, c.MemoryMapSize)
+	c.MemoryMapMutex.RUnlock()
 
 	return data, exists
 }
@@ -151,9 +151,9 @@ func (c *Cache) memoryMapWrite(key string, data *[]byte) {
 	}
 
 	c.MemoryMap[key] = *data
-	fmt.Println("c.MemoryMapKeyHistory before: ", c.MemoryMapKeyHistory)
+	fmt.Println("c.MemoryMapKeyHistory before: ", len(c.MemoryMapKeyHistory))
 	c.MemoryMapKeyHistory = append(c.MemoryMapKeyHistory, key)
-	fmt.Println("c.MemoryMapKeyHistory after: ", c.MemoryMapKeyHistory)
+	fmt.Println("c.MemoryMapKeyHistory after: ", len(c.MemoryMapKeyHistory))
 
 	c.MemoryMapSize += len(*data)
 	fmt.Println("c.MemoryMapSize after: ", c.MemoryMapSize)
@@ -255,6 +255,7 @@ func (c *Cache) ValidateCache() {
 	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
+/*
 func (c *Cache) PreloadMemoryMap() {
 	c.logInfo("Preloading cached tiles into memory map...")
 
@@ -306,6 +307,7 @@ func (c *Cache) PreloadMemoryMap() {
 	fmt.Println("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
 	fmt.Printf("%p\n", &c.MemoryMapKeyHistory)
 }
+*/
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
 	start := time.Now()

@@ -66,7 +66,7 @@ func main() {
 		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
 	if err == nil {
 		osmcache.ValidateCache()
-		osmcache.PreloadMemoryMap()
+		//osmcache.PreloadMemoryMap()
 	}
 
 	/*
