@@ -23,6 +23,8 @@ type FilePath struct {
 
 type CacheStats struct {
 	BytesServedFromCache  int
+	BytesServedFromHDD    int
+	BytesServedFromMemory int
 	BytesServedFromOrigin int
 }
 
@@ -31,15 +33,23 @@ type Cache struct {
 	UrlScheme       string
 	StructureParams []string
 	TimeToLive      time.Duration
+	MemoryMap       map[string][]byte
+	MemoryMapSize   int
 	ApiKey          string
 	Stats           CacheStats
 	Logger          LoggerConfig
 }
 
-func New(route []string, urlScheme string, structureParams []string,
-	TimeToLiveDays time.Duration, apiKey string,
-	debugLogger func(string), infoLogger func(string),
-	warnLogger func(string), errorLogger func(string),
+func New(route []string,
+	urlScheme string,
+	structureParams []string,
+	TimeToLiveDays time.Duration,
+	maxMemoryFootprint int,
+	apiKey string,
+	debugLogger func(string),
+	infoLogger func(string),
+	warnLogger func(string),
+	errorLogger func(string),
 	statsLogDelay time.Duration) (Cache, error) {
 	start := time.Now()
 
@@ -48,6 +58,7 @@ func New(route []string, urlScheme string, structureParams []string,
 		UrlScheme:       urlScheme,
 		StructureParams: structureParams,
 		TimeToLive:      TimeToLiveDays,
+		MemoryMap:       make(map[string][]byte),
 		ApiKey:          apiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
@@ -100,12 +111,42 @@ func (c *Cache) WipeCache() error {
 	return err
 }
 
+func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
+	start := time.Now()
+	key := c.makeFilepath(requestParams, x, y, z).FullPath
+
+	data, exists := c.MemoryMap[key]
+
+	duration := time.Since(start)
+
+	if exists {
+		c.logDebug("Loaded tile from the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
+		return data, nil
+	} else {
+		c.logDebug("Tile for key [" + key + "] not found in MemoryMap (took " + duration.String() + ")")
+		return nil, errors.New("Tile for key [" + key + "] not found in MemoryMap.")
+	}
+}
+
+func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z string, data []byte) {
+	start := time.Now()
+	key := c.makeFilepath(requestParams, x, y, z).FullPath
+
+	c.MemoryMap[key] = data
+	c.MemoryMapSize += len(data) // TODO: check if existed previously
+
+	// TODO: push key to history array, check size
+
+	duration := time.Since(start)
+	c.logDebug("Tile with " + strconv.Itoa(len(data)) + " Bytes successfully saved to the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
+}
+
 func (c *Cache) isFileOutdated(modtime time.Time) bool {
 	age := time.Now().Sub(modtime)
 	return age > c.TimeToLive
 }
 
-func (c *Cache) doValidateCache() {
+func (c *Cache) ValidateCache() {
 	c.logInfo("Validating cache...")
 
 	start := time.Now()
@@ -166,12 +207,47 @@ func (c *Cache) doValidateCache() {
 	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
-func (c *Cache) ValidateCache(async bool) {
-	if async {
-		go c.doValidateCache()
-	} else {
-		c.doValidateCache()
+func (c *Cache) LoadMemoryMap() {
+	c.logInfo("Preloading cached tiles into memory map...")
+
+	start := time.Now()
+
+	root := filepath.Join(append([]string{"."}, c.Route...)...)
+
+	if _, statErr := os.Stat(root); statErr != nil {
+		c.logDebug("Cache directory not yet created. Aborting preload!")
+		return
 	}
+
+	var totalSize int64 = 0
+
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			totalSize += info.Size()
+
+			// TODO: skip if size limit was exceeded
+
+			data, err := ioutil.ReadFile(path)
+
+			if err != nil {
+				c.logWarn("Could not preload file " + path + ", reason: " + err.Error())
+			} else {
+				c.MemoryMap[path] = data
+				c.MemoryMapSize += len(data) // TODO: check if existed previously
+				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap.")
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		c.logWarn("Could not perform preload, reason: " + err.Error())
+		return
+	}
+
+	duration := time.Since(start)
+	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, took %s)", totalSize, duration.String()))
 }
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
@@ -239,6 +315,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	}
 
 	go c.save(params, x, y, z, &bodyBytes)
+	go c.memoryMapStore(params, x, y, z, bodyBytes)
 
 	duration := time.Since(start)
 	c.logDebug("Serving " + strconv.Itoa(len(bodyBytes)) + " Bytes to client (took " + duration.String() + ")")
@@ -359,7 +436,26 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	params := req.URL.Query()
 	c.logDebug("Request params found : " + fmt.Sprint(params))
 
-	data, err := c.load(&params, x, y, z)
+	var data []byte
+	var err error
+
+	data, err = c.memoryMapLoad(&params, x, y, z)
+
+	if err != nil {
+		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from MemoryMap, will try HDD...")
+		data, err = c.load(&params, x, y, z)
+
+		if err != nil {
+			c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from HDD, will request it from server...")
+		} else {
+			c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in HDD-Storage!")
+			c.Stats.BytesServedFromHDD += len(data)
+			c.memoryMapStore(&params, x, y, z, data)
+		}
+	} else {
+		c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in MemoryMap!")
+		c.Stats.BytesServedFromMemory += len(data)
+	}
 
 	if err != nil {
 		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
