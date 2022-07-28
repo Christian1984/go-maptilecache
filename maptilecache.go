@@ -30,16 +30,18 @@ type CacheStats struct {
 }
 
 type Cache struct {
-	Route           []string
-	UrlScheme       string
-	StructureParams []string
-	TimeToLive      time.Duration
-	MemoryMap       map[string][]byte
-	MemoryMapMutex  *sync.RWMutex
-	MemoryMapSize   int
-	ApiKey          string
-	Stats           CacheStats
-	Logger          LoggerConfig
+	Route               []string
+	UrlScheme           string
+	StructureParams     []string
+	TimeToLive          time.Duration
+	MemoryMap           map[string][]byte
+	MemoryMapKeyHistory []string
+	MemoryMapMutex      *sync.RWMutex
+	MemoryMapSize       int
+	MemoryMapMaxSize    int
+	ApiKey              string
+	Stats               CacheStats
+	Logger              LoggerConfig
 }
 
 func New(route []string,
@@ -56,13 +58,14 @@ func New(route []string,
 	start := time.Now()
 
 	c := Cache{
-		Route:           route,
-		UrlScheme:       urlScheme,
-		StructureParams: structureParams,
-		TimeToLive:      TimeToLiveDays,
-		MemoryMap:       make(map[string][]byte),
-		MemoryMapMutex:  &sync.RWMutex{},
-		ApiKey:          apiKey,
+		Route:            route,
+		UrlScheme:        urlScheme,
+		StructureParams:  structureParams,
+		TimeToLive:       TimeToLiveDays,
+		MemoryMap:        make(map[string][]byte),
+		MemoryMapMutex:   &sync.RWMutex{},
+		MemoryMapMaxSize: maxMemoryFootprint,
+		ApiKey:           apiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
 			LogDebugFunc:  debugLogger,
@@ -114,13 +117,50 @@ func (c *Cache) WipeCache() error {
 	return err
 }
 
+func (c *Cache) memoryMapRead(key string) ([]byte, bool) {
+	c.MemoryMapMutex.RLock()
+	data, exists := c.MemoryMap[key]
+	c.MemoryMapMutex.RUnlock()
+	c.logDebug("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
+
+	return data, exists
+}
+
+func (c *Cache) memoryMapWrite(key string, data *[]byte) {
+	c.MemoryMapMutex.Lock()
+
+	for len(c.MemoryMapKeyHistory) > 0 && c.MemoryMapSize+len(*data) > c.MemoryMapMaxSize {
+		deleteKey := c.MemoryMapKeyHistory[0]
+		c.MemoryMapKeyHistory = c.MemoryMapKeyHistory[1:]
+
+		deleteSize := len(c.MemoryMap[deleteKey])
+		delete(c.MemoryMap, deleteKey)
+
+		c.MemoryMapSize -= deleteSize
+
+		c.logDebug("MemoryMapWrite would exceed maximum capacity. Deleted tile with key [" + deleteKey + "] from MemoryMap, recovered " + strconv.Itoa(deleteSize) + " Bytes.")
+	}
+
+	// check if existed, update size if so
+	prevData, existed := c.MemoryMap[key]
+
+	if existed {
+		c.MemoryMapSize -= len(prevData)
+	}
+
+	c.MemoryMap[key] = *data
+	c.MemoryMapKeyHistory = append(c.MemoryMapKeyHistory, key)
+	c.MemoryMapSize += len(*data)
+
+	c.MemoryMapMutex.Unlock()
+
+}
+
 func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
-	c.MemoryMapMutex.RLock()
-	data, exists := c.MemoryMap[key]
-	c.MemoryMapMutex.RUnlock()
+	data, exists := c.memoryMapRead(key)
 
 	duration := time.Since(start)
 
@@ -137,12 +177,7 @@ func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z 
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
-	c.MemoryMapMutex.Lock()
-	c.MemoryMap[key] = *data
-	c.MemoryMapMutex.Unlock()
-
-	c.MemoryMapSize += len(*data) // TODO: check if existed previously
-
+	c.memoryMapWrite(key, data)
 	// TODO: push key to history array, check size
 
 	duration := time.Since(start)
@@ -215,8 +250,19 @@ func (c *Cache) ValidateCache() {
 	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
-func (c *Cache) LoadMemoryMap() {
+func (c *Cache) PreloadMemoryMap() {
 	c.logInfo("Preloading cached tiles into memory map...")
+
+	// clear existing data
+	c.MemoryMapMutex.Lock()
+
+	for key := range c.MemoryMap {
+		delete(c.MemoryMap, key)
+	}
+
+	c.MemoryMapKeyHistory = []string{} // TODO: this is buggy, reference issue?
+	c.MemoryMapSize = 0
+	c.MemoryMapMutex.Unlock()
 
 	start := time.Now()
 
@@ -232,20 +278,13 @@ func (c *Cache) LoadMemoryMap() {
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			totalSize += info.Size()
-
-			// TODO: skip if size limit was exceeded
-
 			data, err := ioutil.ReadFile(path)
 
 			if err != nil {
 				c.logWarn("Could not preload file " + path + ", reason: " + err.Error())
 			} else {
-				c.MemoryMapMutex.Lock()
-				c.MemoryMap[path] = data
-				c.MemoryMapMutex.Unlock()
-
-				c.MemoryMapSize += len(data) // TODO: check if existed previously
-				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap.")
+				c.memoryMapWrite(path, &data)
+				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap with key [" + path + "].")
 			}
 		}
 
@@ -258,7 +297,8 @@ func (c *Cache) LoadMemoryMap() {
 	}
 
 	duration := time.Since(start)
-	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, took %s)", totalSize, duration.String()))
+	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, len(c.MemoryMap), duration.String()))
+	c.logDebug("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
 }
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
@@ -450,6 +490,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	var data []byte
 	var err error
 
+	c.logDebug("Trying to load tile, tiles in map: " + strconv.Itoa(len(c.MemoryMap)))
 	data, err = c.memoryMapLoad(&params, x, y, z)
 
 	if err != nil {

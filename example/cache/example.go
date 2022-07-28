@@ -58,22 +58,24 @@ func initTestEndpoint() {
 
 func main() {
 	httpListen := "0.0.0.0:9001"
-	statsLogDelay := 30 * time.Second
+	statsLogDelay := 0 * time.Second
 
-	osmcache, err := maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, 512, "",
+	maxMemoryFootprint := 1000 * 1000 * 256 // 256 MB
+
+	osmcache, err := maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, maxMemoryFootprint, "",
 		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
 	if err == nil {
 		osmcache.ValidateCache()
-		osmcache.LoadMemoryMap()
+		osmcache.PreloadMemoryMap()
 	}
 
-	maptilecache.New([]string{"maptilecache", "otm"}, "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, 512, "",
+	maptilecache.New([]string{"maptilecache", "otm"}, "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, maxMemoryFootprint, "",
 		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
 
-	maptilecache.New([]string{"maptilecache", "oaip"}, "http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, 512, "",
+	maptilecache.New([]string{"maptilecache", "oaip"}, "http://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, maxMemoryFootprint, "",
 		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
 
-	maptilecache.New([]string{"maptilecache", "ofm"}, "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png", []string{"path"}, 90*24*time.Hour, 512, "",
+	maptilecache.New([]string{"maptilecache", "ofm"}, "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png", []string{"path"}, 90*24*time.Hour, maxMemoryFootprint, "",
 		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
 
 	go http.ListenAndServe(httpListen, nil)
