@@ -58,14 +58,15 @@ func New(route []string,
 	start := time.Now()
 
 	c := Cache{
-		Route:            route,
-		UrlScheme:        urlScheme,
-		StructureParams:  structureParams,
-		TimeToLive:       TimeToLiveDays,
-		MemoryMap:        make(map[string][]byte),
-		MemoryMapMutex:   &sync.RWMutex{},
-		MemoryMapMaxSize: maxMemoryFootprint,
-		ApiKey:           apiKey,
+		Route:               route,
+		UrlScheme:           urlScheme,
+		StructureParams:     structureParams,
+		TimeToLive:          TimeToLiveDays,
+		MemoryMap:           make(map[string][]byte),
+		MemoryMapKeyHistory: []string{},
+		MemoryMapMutex:      &sync.RWMutex{},
+		MemoryMapMaxSize:    maxMemoryFootprint,
+		ApiKey:              apiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
 			LogDebugFunc:  debugLogger,
@@ -121,7 +122,8 @@ func (c *Cache) memoryMapRead(key string) ([]byte, bool) {
 	c.MemoryMapMutex.RLock()
 	data, exists := c.MemoryMap[key]
 	c.MemoryMapMutex.RUnlock()
-	c.logDebug("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
+	fmt.Println("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
+	fmt.Printf("&c.MemoryMapKeyHistory: %p, c.MemoryMapSize: %d\n", &c.MemoryMapKeyHistory, c.MemoryMapSize)
 
 	return data, exists
 }
@@ -149,8 +151,12 @@ func (c *Cache) memoryMapWrite(key string, data *[]byte) {
 	}
 
 	c.MemoryMap[key] = *data
+	fmt.Println("c.MemoryMapKeyHistory before: ", c.MemoryMapKeyHistory)
 	c.MemoryMapKeyHistory = append(c.MemoryMapKeyHistory, key)
+	fmt.Println("c.MemoryMapKeyHistory after: ", c.MemoryMapKeyHistory)
+
 	c.MemoryMapSize += len(*data)
+	fmt.Println("c.MemoryMapSize after: ", c.MemoryMapSize)
 
 	c.MemoryMapMutex.Unlock()
 
@@ -178,7 +184,6 @@ func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z 
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
 	c.memoryMapWrite(key, data)
-	// TODO: push key to history array, check size
 
 	duration := time.Since(start)
 	c.logDebug("Tile with " + strconv.Itoa(len(*data)) + " Bytes successfully saved to the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
@@ -298,7 +303,8 @@ func (c *Cache) PreloadMemoryMap() {
 
 	duration := time.Since(start)
 	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, len(c.MemoryMap), duration.String()))
-	c.logDebug("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
+	fmt.Println("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
+	fmt.Printf("%p\n", &c.MemoryMapKeyHistory)
 }
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
