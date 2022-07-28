@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/djherbis/times"
@@ -34,6 +35,7 @@ type Cache struct {
 	StructureParams []string
 	TimeToLive      time.Duration
 	MemoryMap       map[string][]byte
+	MemoryMapMutex  *sync.RWMutex
 	MemoryMapSize   int
 	ApiKey          string
 	Stats           CacheStats
@@ -59,6 +61,7 @@ func New(route []string,
 		StructureParams: structureParams,
 		TimeToLive:      TimeToLiveDays,
 		MemoryMap:       make(map[string][]byte),
+		MemoryMapMutex:  &sync.RWMutex{},
 		ApiKey:          apiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
@@ -115,7 +118,9 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
+	c.MemoryMapMutex.RLock()
 	data, exists := c.MemoryMap[key]
+	c.MemoryMapMutex.RUnlock()
 
 	duration := time.Since(start)
 
@@ -128,17 +133,20 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 	}
 }
 
-func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z string, data []byte) {
+func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z string, data *[]byte) {
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
-	c.MemoryMap[key] = data
-	c.MemoryMapSize += len(data) // TODO: check if existed previously
+	c.MemoryMapMutex.Lock()
+	c.MemoryMap[key] = *data
+	c.MemoryMapMutex.Unlock()
+
+	c.MemoryMapSize += len(*data) // TODO: check if existed previously
 
 	// TODO: push key to history array, check size
 
 	duration := time.Since(start)
-	c.logDebug("Tile with " + strconv.Itoa(len(data)) + " Bytes successfully saved to the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
+	c.logDebug("Tile with " + strconv.Itoa(len(*data)) + " Bytes successfully saved to the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
 }
 
 func (c *Cache) isFileOutdated(modtime time.Time) bool {
@@ -232,7 +240,10 @@ func (c *Cache) LoadMemoryMap() {
 			if err != nil {
 				c.logWarn("Could not preload file " + path + ", reason: " + err.Error())
 			} else {
+				c.MemoryMapMutex.Lock()
 				c.MemoryMap[path] = data
+				c.MemoryMapMutex.Unlock()
+
 				c.MemoryMapSize += len(data) // TODO: check if existed previously
 				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap.")
 			}
@@ -315,7 +326,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	}
 
 	go c.save(params, x, y, z, &bodyBytes)
-	go c.memoryMapStore(params, x, y, z, bodyBytes)
+	go c.memoryMapStore(params, x, y, z, &bodyBytes)
 
 	duration := time.Since(start)
 	c.logDebug("Serving " + strconv.Itoa(len(bodyBytes)) + " Bytes to client (took " + duration.String() + ")")
@@ -450,7 +461,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		} else {
 			c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in HDD-Storage!")
 			c.Stats.BytesServedFromHDD += len(data)
-			c.memoryMapStore(&params, x, y, z, data)
+			c.memoryMapStore(&params, x, y, z, &data)
 		}
 	} else {
 		c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in MemoryMap!")

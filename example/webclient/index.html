@@ -67,7 +67,7 @@
             transparent: true
         });
 
-        const ofmc2200 = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2200/aero/latest", {
+        const ofmc2206 = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2206/aero/latest", {
             maxZoom: 18,
             minZoom: 2,
             tileSize: map_resolution.tile_size,
@@ -75,7 +75,15 @@
             format: "image/png"
         });
 
-        const ofmc2204 = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2204/aero/latest", {
+        const ofmc2207 = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2207/aero/latest", {
+            maxZoom: 18,
+            minZoom: 2,
+            tileSize: map_resolution.tile_size,
+            zoomOffset: map_resolution.zoom_offset,
+            format: "image/png"
+        });
+
+        const ofmc2207uc = new L.TileLayer("https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=2207/aero/latest", {
             maxZoom: 18,
             minZoom: 2,
             tileSize: map_resolution.tile_size,
@@ -98,8 +106,9 @@
         const overlayMaps = {
             //"openAIP": oaip,
             "openAIP Cached": oaipc,
-            "OFM Cached (2200)": ofmc2200,
-            "OFM Cached (2204)": ofmc2204
+            "OFM Cached (2206)": ofmc2206,
+            "OFM Cached (2207)": ofmc2207,
+            "OFM Cached (2207) uncached": ofmc2207uc
         };
 
         L.control.layers(baseMaps, overlayMaps).addTo(map);
