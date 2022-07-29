@@ -58,6 +58,7 @@ func main() {
         []string{},                                          // expected query parameters 
                                                              // for additional cache organization
         90*24*time.Hour,                                     // time to live
+        512 * 1024 * 1024                                    // max memory footprint in bytes
         "",                                                  // API key
         maptilecache.PrintlnDebugLogger,                     // logger callbacks
         maptilecache.PrintlnInfoLogger,
