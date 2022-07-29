@@ -60,13 +60,13 @@ func main() {
 	httpListen := "0.0.0.0:9001"
 	statsLogDelay := 0 * time.Second
 
-	maxMemoryFootprint := 1000 * 1000 * 256 // 256 MB
+	maxMemoryFootprint := 100000 // 1000 * 1000 * 256 // 256 MB
 
 	osmcache, err := maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, maxMemoryFootprint, "",
 		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
 	if err == nil {
 		osmcache.ValidateCache()
-		//osmcache.PreloadMemoryMap()
+		osmcache.PreloadMemoryMap()
 	}
 
 	/*

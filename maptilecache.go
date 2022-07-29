@@ -54,7 +54,7 @@ func New(route []string,
 	infoLogger func(string),
 	warnLogger func(string),
 	errorLogger func(string),
-	statsLogDelay time.Duration) (Cache, error) {
+	statsLogDelay time.Duration) (*Cache, error) {
 	start := time.Now()
 
 	c := Cache{
@@ -78,7 +78,7 @@ func New(route []string,
 	}
 
 	if len(route) < 1 {
-		return c, errors.New("Could not initialize Cache, reason: Route invalid, must have at least one entry!")
+		return &c, errors.New("Could not initialize Cache, reason: Route invalid, must have at least one entry!")
 	}
 
 	routeString := strings.Join(route, "/")
@@ -90,7 +90,7 @@ func New(route []string,
 	duration := time.Since(start)
 	c.logInfo("New Cache initialized on route /" + routeString + "/ (took " + duration.String() + ")")
 
-	return c, nil
+	return &c, nil
 
 }
 
@@ -121,8 +121,6 @@ func (c *Cache) WipeCache() error {
 func (c *Cache) memoryMapRead(key string) ([]byte, bool) {
 	c.MemoryMapMutex.RLock()
 	data, exists := c.MemoryMap[key]
-	fmt.Println("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
-	fmt.Printf("&c.MemoryMapKeyHistory: %p, c.MemoryMapSize: %d\n", &c.MemoryMapKeyHistory, c.MemoryMapSize)
 	c.MemoryMapMutex.RUnlock()
 
 	return data, exists
@@ -151,12 +149,9 @@ func (c *Cache) memoryMapWrite(key string, data *[]byte) {
 	}
 
 	c.MemoryMap[key] = *data
-	fmt.Println("c.MemoryMapKeyHistory before: ", len(c.MemoryMapKeyHistory))
 	c.MemoryMapKeyHistory = append(c.MemoryMapKeyHistory, key)
-	fmt.Println("c.MemoryMapKeyHistory after: ", len(c.MemoryMapKeyHistory))
 
 	c.MemoryMapSize += len(*data)
-	fmt.Println("c.MemoryMapSize after: ", c.MemoryMapSize)
 
 	c.MemoryMapMutex.Unlock()
 
@@ -255,16 +250,13 @@ func (c *Cache) ValidateCache() {
 	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
-/*
 func (c *Cache) PreloadMemoryMap() {
 	c.logInfo("Preloading cached tiles into memory map...")
 
 	// clear existing data
 	c.MemoryMapMutex.Lock()
 
-	for key := range c.MemoryMap {
-		delete(c.MemoryMap, key)
-	}
+	c.MemoryMap = make(map[string][]byte)
 
 	c.MemoryMapKeyHistory = []string{} // TODO: this is buggy, reference issue?
 	c.MemoryMapSize = 0
@@ -304,10 +296,7 @@ func (c *Cache) PreloadMemoryMap() {
 
 	duration := time.Since(start)
 	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, len(c.MemoryMap), duration.String()))
-	fmt.Println("c.MemoryMapKeyHistory: " + strconv.Itoa(len(c.MemoryMapKeyHistory)))
-	fmt.Printf("%p\n", &c.MemoryMapKeyHistory)
 }
-*/
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
 	start := time.Now()
