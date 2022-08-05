@@ -18,5 +18,8 @@ vendor/
 # Example cache data
 example/cache/maptilecache/
 
+# Example API keys
+example/cache/secrets/secrets.go
+
 # Go workspace file
 go.work

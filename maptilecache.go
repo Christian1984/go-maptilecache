@@ -34,6 +34,7 @@ type Cache struct {
 	UrlScheme           string
 	StructureParams     []string
 	TimeToLive          time.Duration
+	ForwardHeaders      bool
 	MemoryMap           map[string][]byte
 	MemoryMapKeyHistory []string
 	MemoryMapMutex      *sync.RWMutex
@@ -47,7 +48,8 @@ type Cache struct {
 func New(route []string,
 	urlScheme string,
 	structureParams []string,
-	TimeToLiveDays time.Duration,
+	timeToLiveDays time.Duration,
+	forwardHeaders bool,
 	maxMemoryFootprint int,
 	apiKey string,
 	debugLogger func(string),
@@ -61,7 +63,8 @@ func New(route []string,
 		Route:               route,
 		UrlScheme:           urlScheme,
 		StructureParams:     structureParams,
-		TimeToLive:          TimeToLiveDays,
+		TimeToLive:          timeToLiveDays,
+		ForwardHeaders:      forwardHeaders,
 		MemoryMap:           make(map[string][]byte),
 		MemoryMapKeyHistory: []string{},
 		MemoryMapMutex:      &sync.RWMutex{},
@@ -318,7 +321,9 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 		return nil, err
 	}
 
-	req.Header = *sourceHeader
+	if c.ForwardHeaders {
+		req.Header = *sourceHeader
+	}
 
 	query := req.URL.Query()
 	if params != nil {
@@ -356,9 +361,12 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	}
 
 	c.logDebug("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
+	if len(bodyBytes) > 20 {
+		c.logDebug("First 20 bytes received: " + string(bodyBytes[:21]))
+	}
 
-	if len(bodyBytes) == 0 {
-		c.logError("Invalid response body, reason: size == 0 Bytes")
+	if !c.isValidTile(bodyBytes) {
+		c.logError("Invalid response body.")
 		return nil, errors.New("Invalid response body")
 	}
 
@@ -432,6 +440,21 @@ func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([
 	c.logDebug("Loaded tile from " + fp.FullPath + " (took " + duration.String() + ")")
 
 	return data, nil
+}
+
+func (c *Cache) isValidTile(bytes []byte) bool {
+	if len(bytes) < 4 {
+		c.logDebug("Tile invalid, response body was empty.")
+		return false
+	}
+
+	header := strings.ToLower(string(bytes[1:4]))
+	if header != "png" {
+		c.logDebug("Tile invalid, header != [PNG], got [" + header + "] instead")
+		return false
+	}
+
+	return true
 }
 
 func (c *Cache) save(requestParams *url.Values, x string, y string, z string, data *[]byte) error {
