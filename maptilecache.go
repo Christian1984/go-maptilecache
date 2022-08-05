@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/djherbis/times"
@@ -30,19 +29,15 @@ type CacheStats struct {
 }
 
 type Cache struct {
-	Route               []string
-	UrlScheme           string
-	StructureParams     []string
-	TimeToLive          time.Duration
-	ForwardHeaders      bool
-	MemoryMap           map[string][]byte
-	MemoryMapKeyHistory []string
-	MemoryMapMutex      *sync.RWMutex
-	MemoryMapSize       int
-	MemoryMapMaxSize    int
-	ApiKey              string
-	Stats               CacheStats
-	Logger              LoggerConfig
+	Route           []string
+	UrlScheme       string
+	StructureParams []string
+	TimeToLive      time.Duration
+	ForwardHeaders  bool
+	SharedMemCache  *SharedMemoryCache
+	ApiKey          string
+	Stats           CacheStats
+	Logger          LoggerConfig
 }
 
 func New(route []string,
@@ -50,6 +45,7 @@ func New(route []string,
 	structureParams []string,
 	timeToLiveDays time.Duration,
 	forwardHeaders bool,
+	sharedMemCache *SharedMemoryCache,
 	maxMemoryFootprint int,
 	apiKey string,
 	debugLogger func(string),
@@ -60,16 +56,13 @@ func New(route []string,
 	start := time.Now()
 
 	c := Cache{
-		Route:               route,
-		UrlScheme:           urlScheme,
-		StructureParams:     structureParams,
-		TimeToLive:          timeToLiveDays,
-		ForwardHeaders:      forwardHeaders,
-		MemoryMap:           make(map[string][]byte),
-		MemoryMapKeyHistory: []string{},
-		MemoryMapMutex:      &sync.RWMutex{},
-		MemoryMapMaxSize:    maxMemoryFootprint,
-		ApiKey:              apiKey,
+		Route:           route,
+		UrlScheme:       urlScheme,
+		StructureParams: structureParams,
+		TimeToLive:      timeToLiveDays,
+		ForwardHeaders:  forwardHeaders,
+		SharedMemCache:  sharedMemCache,
+		ApiKey:          apiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
 			LogDebugFunc:  debugLogger,
@@ -119,45 +112,6 @@ func (c *Cache) WipeCache() error {
 	}
 
 	return err
-}
-
-func (c *Cache) memoryMapRead(key string) ([]byte, bool) {
-	c.MemoryMapMutex.RLock()
-	data, exists := c.MemoryMap[key]
-	c.MemoryMapMutex.RUnlock()
-
-	return data, exists
-}
-
-func (c *Cache) memoryMapWrite(key string, data *[]byte) {
-	c.MemoryMapMutex.Lock()
-
-	for len(c.MemoryMapKeyHistory) > 0 && c.MemoryMapSize+len(*data) > c.MemoryMapMaxSize {
-		deleteKey := c.MemoryMapKeyHistory[0]
-		c.MemoryMapKeyHistory = c.MemoryMapKeyHistory[1:]
-
-		deleteSize := len(c.MemoryMap[deleteKey])
-		delete(c.MemoryMap, deleteKey)
-
-		c.MemoryMapSize -= deleteSize
-
-		c.logDebug("MemoryMapWrite would exceed maximum capacity. Deleted tile with key [" + deleteKey + "] from MemoryMap, recovered " + strconv.Itoa(deleteSize) + " Bytes.")
-	}
-
-	// check if existed, update size if so
-	prevData, existed := c.MemoryMap[key]
-
-	if existed {
-		c.MemoryMapSize -= len(prevData)
-	}
-
-	c.MemoryMap[key] = *data
-	c.MemoryMapKeyHistory = append(c.MemoryMapKeyHistory, key)
-
-	c.MemoryMapSize += len(*data)
-
-	c.MemoryMapMutex.Unlock()
-
 }
 
 func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
