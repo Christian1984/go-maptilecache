@@ -46,7 +46,6 @@ func New(route []string,
 	timeToLiveDays time.Duration,
 	forwardHeaders bool,
 	sharedMemCache *SharedMemoryCache,
-	maxMemoryFootprint int,
 	apiKey string,
 	debugLogger func(string),
 	infoLogger func(string),
@@ -74,10 +73,10 @@ func New(route []string,
 	}
 
 	if len(route) < 1 {
-		return &c, errors.New("Could not initialize Cache, reason: Route invalid, must have at least one entry!")
+		return &c, errors.New("could not initialize cache, reason: route invalid, must have at least one entry")
 	}
 
-	routeString := strings.Join(route, "/")
+	routeString := routeString(route)
 
 	http.HandleFunc("/"+routeString+"/", c.serve)
 
@@ -88,6 +87,10 @@ func New(route []string,
 
 	return &c, nil
 
+}
+
+func routeString(route []string) string {
+	return strings.Join(route, "/")
 }
 
 func (c *Cache) WipeCache() error {
@@ -118,7 +121,8 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
-	data, exists := c.memoryMapRead(key)
+	//data, exists := c.memoryMapRead(key)
+	data, exists := c.SharedMemCache.memoryMapRead(routeString(c.Route), key)
 
 	duration := time.Since(start)
 
@@ -135,7 +139,7 @@ func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z 
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
-	c.memoryMapWrite(key, data)
+	c.SharedMemCache.memoryMapWrite(routeString(c.Route), key, data)
 
 	duration := time.Since(start)
 	c.logDebug("Tile with " + strconv.Itoa(len(*data)) + " Bytes successfully saved to the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
@@ -207,6 +211,7 @@ func (c *Cache) ValidateCache() {
 	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
+/*
 func (c *Cache) PreloadMemoryMap() {
 	c.logInfo("Preloading cached tiles into memory map...")
 
@@ -254,6 +259,7 @@ func (c *Cache) PreloadMemoryMap() {
 	duration := time.Since(start)
 	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, len(c.MemoryMap), duration.String()))
 }
+*/
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
 	start := time.Now()
@@ -464,7 +470,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	var data []byte
 	var err error
 
-	c.logDebug("Trying to load tile, tiles in map: " + strconv.Itoa(len(c.MemoryMap)))
+	c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*c.SharedMemCache.MemoryMaps[routeString(c.Route)].Tiles)))
 	data, err = c.memoryMapLoad(&params, x, y, z)
 
 	if err != nil {
