@@ -49,21 +49,21 @@ func NewSharedMemoryCache(
 
 func (m *SharedMemoryCache) memoryMapRead(mapKey string, tileKey string) ([]byte, bool) {
 	m.MemoryMapMutex.RLock()
+	defer m.MemoryMapMutex.RUnlock()
+
 	memoryMap, mapExists := m.MemoryMaps[mapKey]
 
 	if !mapExists {
-		m.MemoryMapMutex.RUnlock()
 		return nil, false
 	}
 
 	data, exists := (*memoryMap.Tiles)[tileKey]
-
-	m.MemoryMapMutex.RUnlock()
 	return data, exists
 }
 
 func (m *SharedMemoryCache) memoryMapWrite(mapKey string, tileKey string, data *[]byte) {
 	m.MemoryMapMutex.Lock()
+	defer m.MemoryMapMutex.Unlock()
 
 	i := 0
 
@@ -107,6 +107,4 @@ func (m *SharedMemoryCache) memoryMapWrite(mapKey string, tileKey string, data *
 	m.MemoryMapKeyHistory = append(m.MemoryMapKeyHistory, MemoryMapKeyHistoyItem{MemoryMapKey: mapKey, TileKey: tileKey})
 
 	m.MemoryMapSize += len(*data)
-
-	m.MemoryMapMutex.Unlock()
 }
