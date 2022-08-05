@@ -36,6 +36,7 @@ func NewSharedMemoryCache(
 	m := SharedMemoryCache{
 		MemoryMaps:          make(map[string]*MemoryMap),
 		MemoryMapKeyHistory: []MemoryMapKeyHistoyItem{},
+		MemoryMapMutex:      &sync.RWMutex{},
 		MemoryMapMaxSize:    maxMemoryFootprint,
 		DebugLogger:         debugLogger,
 		InfoLogger:          infoLogger,
@@ -51,20 +52,24 @@ func (m *SharedMemoryCache) memoryMapRead(mapKey string, tileKey string) ([]byte
 	memoryMap, mapExists := m.MemoryMaps[mapKey]
 
 	if !mapExists {
+		m.MemoryMapMutex.RUnlock()
 		return nil, false
 	}
 
 	data, exists := (*memoryMap.Tiles)[tileKey]
 
 	m.MemoryMapMutex.RUnlock()
-
 	return data, exists
 }
 
 func (m *SharedMemoryCache) memoryMapWrite(mapKey string, tileKey string, data *[]byte) {
 	m.MemoryMapMutex.Lock()
 
+	i := 0
+
 	for len(m.MemoryMapKeyHistory) > 0 && m.MemoryMapSize+len(*data) > m.MemoryMapMaxSize {
+		i++
+		m.DebugLogger("i" + strconv.Itoa(i))
 		deleteKeys := m.MemoryMapKeyHistory[0]
 		m.MemoryMapKeyHistory = m.MemoryMapKeyHistory[1:]
 

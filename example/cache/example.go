@@ -62,22 +62,74 @@ func main() {
 	statsLogDelay := 0 * time.Second
 
 	maxMemoryFootprint := 100000 // 1000 * 1000 * 256 // 256 MB
+	ttl := 10 * 24 * time.Hour
 
-	osmcache, err := maptilecache.New([]string{"maptilecache", "osm"}, "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, true, maxMemoryFootprint, "",
-		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
+	sharedmemorycache := maptilecache.NewSharedMemoryCache(maxMemoryFootprint, maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger)
+
+	osmcache, err := maptilecache.New(
+		[]string{"maptilecache", "osm"},
+		"http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+		[]string{},
+		ttl,
+		true,
+		sharedmemorycache,
+		"",
+		maptilecache.PrintlnDebugLogger,
+		maptilecache.PrintlnInfoLogger,
+		maptilecache.PrintlnWarnLogger,
+		maptilecache.PrintlnErrorLogger,
+		statsLogDelay,
+	)
+
 	if err == nil {
 		osmcache.ValidateCache()
-		osmcache.PreloadMemoryMap()
+		// osmcache.PreloadMemoryMap()
 	}
 
-	maptilecache.New([]string{"maptilecache", "otm"}, "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", []string{}, 90*24*time.Hour, true, maxMemoryFootprint, "",
-		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
+	maptilecache.New(
+		[]string{"maptilecache", "otm"},
+		"https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+		[]string{},
+		90*24*time.Hour,
+		true,
+		sharedmemorycache,
+		"",
+		maptilecache.PrintlnDebugLogger,
+		maptilecache.PrintlnInfoLogger,
+		maptilecache.PrintlnWarnLogger,
+		maptilecache.PrintlnErrorLogger,
+		statsLogDelay,
+	)
 
-	maptilecache.New([]string{"maptilecache", "oaip-airports"}, "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}", []string{}, 90*24*time.Hour, false, maxMemoryFootprint, secrets.OAPI_API_KEY,
-		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
+	maptilecache.New(
+		[]string{"maptilecache", "oaip-airports"},
+		"https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
+		[]string{},
+		90*24*time.Hour,
+		false,
+		sharedmemorycache,
+		secrets.OAPI_API_KEY,
+		maptilecache.PrintlnDebugLogger,
+		maptilecache.PrintlnInfoLogger,
+		maptilecache.PrintlnWarnLogger,
+		maptilecache.PrintlnErrorLogger,
+		statsLogDelay,
+	)
 
-	maptilecache.New([]string{"maptilecache", "oaip-airspaces"}, "https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey={apiKey}", []string{}, 90*24*time.Hour, false, maxMemoryFootprint, secrets.OAPI_API_KEY,
-		maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger, statsLogDelay)
+	maptilecache.New(
+		[]string{"maptilecache", "oaip-airspaces"},
+		"https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey={apiKey}",
+		[]string{},
+		90*24*time.Hour,
+		false,
+		sharedmemorycache,
+		secrets.OAPI_API_KEY,
+		maptilecache.PrintlnDebugLogger,
+		maptilecache.PrintlnInfoLogger,
+		maptilecache.PrintlnWarnLogger,
+		maptilecache.PrintlnErrorLogger,
+		statsLogDelay,
+	)
 
 	/*
 		maptilecache.New([]string{"maptilecache", "ofm"}, "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png", []string{"path"}, 90*24*time.Hour, true, maxMemoryFootprint, "",

@@ -470,7 +470,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	var data []byte
 	var err error
 
-	c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*c.SharedMemCache.MemoryMaps[routeString(c.Route)].Tiles)))
+	//c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*(c.SharedMemCache.MemoryMaps)[routeString(c.Route)].Tiles)))
 	data, err = c.memoryMapLoad(&params, x, y, z)
 
 	if err != nil {
