@@ -61,7 +61,7 @@ func main() {
 	httpListen := "0.0.0.0:9001"
 	statsLogDelay := 0 * time.Second
 
-	maxMemoryFootprint := 100000 // 1000 * 1000 * 256 // 256 MB
+	maxMemoryFootprint := 1024 * 1024 * 256 // 256 MB
 	ttl := 10 * 24 * time.Hour
 
 	sharedmemorycache := maptilecache.NewSharedMemoryCache(maxMemoryFootprint, maptilecache.PrintlnDebugLogger, maptilecache.PrintlnInfoLogger, maptilecache.PrintlnWarnLogger, maptilecache.PrintlnErrorLogger)
@@ -83,10 +83,10 @@ func main() {
 
 	if err == nil {
 		osmcache.ValidateCache()
-		// osmcache.PreloadMemoryMap()
+		osmcache.PreloadMemoryMap()
 	}
 
-	maptilecache.New(
+	otmcache, err := maptilecache.New(
 		[]string{"maptilecache", "otm"},
 		"https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
 		[]string{},
@@ -100,6 +100,11 @@ func main() {
 		maptilecache.PrintlnErrorLogger,
 		statsLogDelay,
 	)
+
+	if err == nil {
+		otmcache.ValidateCache()
+		otmcache.PreloadMemoryMap()
+	}
 
 	maptilecache.New(
 		[]string{"maptilecache", "oaip-airports"},

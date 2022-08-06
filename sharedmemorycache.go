@@ -47,7 +47,30 @@ func NewSharedMemoryCache(
 	return &m
 }
 
-func (m *SharedMemoryCache) memoryMapRead(mapKey string, tileKey string) ([]byte, bool) {
+/*
+// TODO: is this required at all? probably not...
+func (m *SharedMemoryCache) MemoryMapClear(mapKey string) {
+	m.InfoLogger("Clearing memory cache with mapKey [" + mapKey + "]")
+
+	m.MemoryMapMutex.Lock()
+	defer m.MemoryMapMutex.Unlock()
+
+	_, mapExists:= m.MemoryMaps[mapKey]
+
+	if !mapExists {
+		m.WarnLogger("Map with mapKey [" + mapKey + "] does not exist. Abort clearing...")
+		return
+
+	}
+
+	// TODO: remove tiles from history, update cache size
+	newMap := make(map[string][]byte)
+	memoryMap := &MemoryMap{Tiles: &newMap}
+	m.MemoryMaps[mapKey] = memoryMap
+}
+*/
+
+func (m *SharedMemoryCache) MemoryMapRead(mapKey string, tileKey string) ([]byte, bool) {
 	m.MemoryMapMutex.RLock()
 	defer m.MemoryMapMutex.RUnlock()
 
@@ -61,7 +84,7 @@ func (m *SharedMemoryCache) memoryMapRead(mapKey string, tileKey string) ([]byte
 	return data, exists
 }
 
-func (m *SharedMemoryCache) memoryMapWrite(mapKey string, tileKey string, data *[]byte) {
+func (m *SharedMemoryCache) MemoryMapWrite(mapKey string, tileKey string, data *[]byte) {
 	m.MemoryMapMutex.Lock()
 	defer m.MemoryMapMutex.Unlock()
 

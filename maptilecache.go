@@ -30,6 +30,7 @@ type CacheStats struct {
 
 type Cache struct {
 	Route           []string
+	RouteString     string
 	UrlScheme       string
 	StructureParams []string
 	TimeToLive      time.Duration
@@ -54,8 +55,11 @@ func New(route []string,
 	statsLogDelay time.Duration) (*Cache, error) {
 	start := time.Now()
 
+	routeString := routeString(route)
+
 	c := Cache{
 		Route:           route,
+		RouteString:     routeString,
 		UrlScheme:       urlScheme,
 		StructureParams: structureParams,
 		TimeToLive:      timeToLiveDays,
@@ -75,8 +79,6 @@ func New(route []string,
 	if len(route) < 1 {
 		return &c, errors.New("could not initialize cache, reason: route invalid, must have at least one entry")
 	}
-
-	routeString := routeString(route)
 
 	http.HandleFunc("/"+routeString+"/", c.serve)
 
@@ -122,7 +124,7 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
 	//data, exists := c.memoryMapRead(key)
-	data, exists := c.SharedMemCache.memoryMapRead(routeString(c.Route), key)
+	data, exists := c.SharedMemCache.MemoryMapRead(c.RouteString, key)
 
 	duration := time.Since(start)
 
@@ -139,7 +141,7 @@ func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z 
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
-	c.SharedMemCache.memoryMapWrite(routeString(c.Route), key, data)
+	c.SharedMemCache.MemoryMapWrite(c.RouteString, key, data)
 
 	duration := time.Since(start)
 	c.logDebug("Tile with " + strconv.Itoa(len(*data)) + " Bytes successfully saved to the MemoryMap with key [" + key + "] (took " + duration.String() + ")")
@@ -211,18 +213,8 @@ func (c *Cache) ValidateCache() {
 	c.logInfo(fmt.Sprintf("Cache validated and cleaned! (Size before: %d Bytes, Size now: %d Bytes, %d Bytes removed, took %s)", totalSize, totalSize-removedFilesSize, removedFilesSize, duration.String()))
 }
 
-/*
 func (c *Cache) PreloadMemoryMap() {
 	c.logInfo("Preloading cached tiles into memory map...")
-
-	// clear existing data
-	c.MemoryMapMutex.Lock()
-
-	c.MemoryMap = make(map[string][]byte)
-
-	c.MemoryMapKeyHistory = []string{} // TODO: this is buggy, reference issue?
-	c.MemoryMapSize = 0
-	c.MemoryMapMutex.Unlock()
 
 	start := time.Now()
 
@@ -234,17 +226,19 @@ func (c *Cache) PreloadMemoryMap() {
 	}
 
 	var totalSize int64 = 0
+	tilesStored := 0
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			totalSize += info.Size()
+			tilesStored++
 			data, err := ioutil.ReadFile(path)
 
 			if err != nil {
 				c.logWarn("Could not preload file " + path + ", reason: " + err.Error())
 			} else {
-				c.memoryMapWrite(path, &data)
-				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap with key [" + path + "].")
+				c.SharedMemCache.MemoryMapWrite(c.RouteString, path, &data)
+				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap [" + c.RouteString + "] with tileKey [" + path + "].")
 			}
 		}
 
@@ -257,9 +251,8 @@ func (c *Cache) PreloadMemoryMap() {
 	}
 
 	duration := time.Since(start)
-	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, len(c.MemoryMap), duration.String()))
+	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, tilesStored, duration.String()))
 }
-*/
 
 func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
 	start := time.Now()
@@ -321,13 +314,16 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	}
 
 	c.logDebug("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
-	if len(bodyBytes) > 20 {
-		c.logDebug("First 20 bytes received: " + string(bodyBytes[:21]))
-	}
 
 	if !c.isValidTile(bodyBytes) {
-		c.logError("Invalid response body.")
-		return nil, errors.New("Invalid response body")
+		length := len(bodyBytes)
+		if length > 20 {
+			length = 20
+		}
+
+		c.logDebug("Invalid response body received. First " + strconv.Itoa(length) + " bytes received: " + string(bodyBytes[:length+1]))
+
+		return nil, errors.New("Invalid response body received.")
 	}
 
 	go c.save(params, x, y, z, &bodyBytes)
@@ -422,7 +418,7 @@ func (c *Cache) save(requestParams *url.Values, x string, y string, z string, da
 
 	fp := c.makeFilepath(requestParams, x, y, z)
 
-	c.logDebug("Saving " + strconv.Itoa(len(*data)) + " Bytes to " + fp.FullPath)
+	c.logDebug("Saving " + strconv.Itoa(len(*data)) + " Bytes to filesystem at " + fp.FullPath)
 
 	dirErr := os.MkdirAll(fp.Path, os.ModePerm)
 
@@ -470,7 +466,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	var data []byte
 	var err error
 
-	//c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*(c.SharedMemCache.MemoryMaps)[routeString(c.Route)].Tiles)))
+	//c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*(c.SharedMemCache.MemoryMaps)[c.RouteString].Tiles)))
 	data, err = c.memoryMapLoad(&params, x, y, z)
 
 	if err != nil {
