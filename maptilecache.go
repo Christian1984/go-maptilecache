@@ -41,42 +41,46 @@ type Cache struct {
 	Logger          LoggerConfig
 }
 
-func New(route []string,
-	urlScheme string,
-	structureParams []string,
-	timeToLiveDays time.Duration,
-	forwardHeaders bool,
-	sharedMemCache *SharedMemoryCache,
-	apiKey string,
-	debugLogger func(string),
-	infoLogger func(string),
-	warnLogger func(string),
-	errorLogger func(string),
-	statsLogDelay time.Duration) (*Cache, error) {
+type CacheConfig struct {
+	Route           []string
+	UrlScheme       string
+	StructureParams []string
+	TimeToLiveDays  time.Duration
+	ForwardHeaders  bool
+	SharedMemCache  *SharedMemoryCache
+	ApiKey          string
+	DebugLogger     func(string)
+	InfoLogger      func(string)
+	WarnLogger      func(string)
+	ErrorLogger     func(string)
+	StatsLogDelay   time.Duration
+}
+
+func New(config CacheConfig) (*Cache, error) {
 	start := time.Now()
 
-	routeString := routeString(route)
+	routeString := routeString(config.Route)
 
 	c := Cache{
-		Route:           route,
+		Route:           config.Route,
 		RouteString:     routeString,
-		UrlScheme:       urlScheme,
-		StructureParams: structureParams,
-		TimeToLive:      timeToLiveDays,
-		ForwardHeaders:  forwardHeaders,
-		SharedMemCache:  sharedMemCache,
-		ApiKey:          apiKey,
+		UrlScheme:       config.UrlScheme,
+		StructureParams: config.StructureParams,
+		TimeToLive:      config.TimeToLiveDays,
+		ForwardHeaders:  config.ForwardHeaders,
+		SharedMemCache:  config.SharedMemCache,
+		ApiKey:          config.ApiKey,
 		Logger: LoggerConfig{
-			LogPrefix:     "Cache[" + strings.Join(route, "/") + "]",
-			LogDebugFunc:  debugLogger,
-			LogInfoFunc:   infoLogger,
-			LogWarnFunc:   warnLogger,
-			LogErrorFunc:  errorLogger,
-			StatsLogDelay: statsLogDelay,
+			LogPrefix:     "Cache[" + routeString + "]",
+			LogDebugFunc:  config.DebugLogger,
+			LogInfoFunc:   config.InfoLogger,
+			LogWarnFunc:   config.WarnLogger,
+			LogErrorFunc:  config.ErrorLogger,
+			StatsLogDelay: config.StatsLogDelay,
 		},
 	}
 
-	if len(route) < 1 {
+	if len(config.Route) < 1 {
 		return &c, errors.New("could not initialize cache, reason: route invalid, must have at least one entry")
 	}
 

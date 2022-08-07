@@ -17,35 +17,37 @@ type MemoryMapKeyHistoyItem struct {
 }
 
 type SharedMemoryCache struct {
-	MemoryMaps          map[string]*MemoryMap
-	MemoryMapKeyHistory []MemoryMapKeyHistoyItem
-	SharedMutex         *sync.RWMutex
-	HistoryMutex        *sync.RWMutex
-	MemoryMapSize       int
-	MemoryMapMaxSize    int
-	DebugLogger         func(string)
-	InfoLogger          func(string)
-	WarnLogger          func(string)
-	ErrorLogger         func(string)
+	MemoryMaps            map[string]*MemoryMap
+	MemoryMapKeyHistory   []MemoryMapKeyHistoyItem
+	SharedMutex           *sync.RWMutex
+	MemoryMapHistoryMutex *sync.RWMutex
+	MemoryMapSize         int
+	MemoryMapMaxSize      int
+	DebugLogger           func(string)
+	InfoLogger            func(string)
+	WarnLogger            func(string)
+	ErrorLogger           func(string)
 }
 
-func NewSharedMemoryCache(
-	maxMemoryFootprint int,
-	debugLogger func(string),
-	infoLogger func(string),
-	warnLogger func(string),
-	errorLogger func(string),
-) *SharedMemoryCache {
+type SharedMemoryCacheConfig struct {
+	MaxMemoryFootprint int
+	DebugLogger        func(string)
+	InfoLogger         func(string)
+	WarnLogger         func(string)
+	ErrorLogger        func(string)
+}
+
+func NewSharedMemoryCache(config SharedMemoryCacheConfig) *SharedMemoryCache {
 	m := SharedMemoryCache{
-		MemoryMaps:          make(map[string]*MemoryMap),
-		MemoryMapKeyHistory: []MemoryMapKeyHistoyItem{},
-		SharedMutex:         &sync.RWMutex{},
-		HistoryMutex:        &sync.RWMutex{},
-		MemoryMapMaxSize:    maxMemoryFootprint,
-		DebugLogger:         debugLogger,
-		InfoLogger:          infoLogger,
-		WarnLogger:          warnLogger,
-		ErrorLogger:         errorLogger,
+		MemoryMaps:            make(map[string]*MemoryMap),
+		MemoryMapKeyHistory:   []MemoryMapKeyHistoyItem{},
+		SharedMutex:           &sync.RWMutex{},
+		MemoryMapHistoryMutex: &sync.RWMutex{},
+		MemoryMapMaxSize:      config.MaxMemoryFootprint,
+		DebugLogger:           config.DebugLogger,
+		InfoLogger:            config.InfoLogger,
+		WarnLogger:            config.WarnLogger,
+		ErrorLogger:           config.ErrorLogger,
 	}
 
 	ticker := time.NewTicker(30 * time.Second)
@@ -122,8 +124,8 @@ func (mm *MemoryMap) removeTile(tileKey string) {
 func (m *SharedMemoryCache) EnsureMaxSize() {
 	m.logDebug("EnsureMaxSize()  called...")
 
-	m.HistoryMutex.Lock()
-	defer m.HistoryMutex.Unlock()
+	m.MemoryMapHistoryMutex.Lock()
+	defer m.MemoryMapHistoryMutex.Unlock()
 
 	for len(m.MemoryMapKeyHistory) > 0 && m.MemoryMapSize > m.MemoryMapMaxSize {
 		deleteKeys := m.MemoryMapKeyHistory[0]
@@ -177,9 +179,9 @@ func (m *SharedMemoryCache) MemoryMapWrite(mapKey string, tileKey string, data *
 	memoryMap.addTile(tileKey, data)
 	memoryMap.Mutex.Unlock()
 
-	m.HistoryMutex.Lock()
+	m.MemoryMapHistoryMutex.Lock()
 	m.MemoryMapSize -= oldDataSize
 	m.MemoryMapKeyHistory = append(m.MemoryMapKeyHistory, MemoryMapKeyHistoyItem{MemoryMapKey: mapKey, TileKey: tileKey})
 	m.MemoryMapSize += newDataSize
-	m.HistoryMutex.Unlock()
+	m.MemoryMapHistoryMutex.Unlock()
 }
