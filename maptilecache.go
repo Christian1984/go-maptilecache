@@ -123,6 +123,12 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
+	if c.SharedMemCache == nil {
+		msg := "SharedMemoryCache not set, cannot load tile with key [" + key + "] from memory map."
+		c.logDebug(msg)
+		return nil, errors.New(msg)
+	}
+
 	//data, exists := c.memoryMapRead(key)
 	data, exists := c.SharedMemCache.MemoryMapRead(c.RouteString, key)
 
@@ -140,6 +146,12 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 func (c *Cache) memoryMapStore(requestParams *url.Values, x string, y string, z string, data *[]byte) {
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
+
+	if c.SharedMemCache == nil {
+		msg := "SharedMemoryCache not set, cannot store tile with key [" + key + "] in memory map."
+		c.logDebug(msg)
+		return
+	}
 
 	c.SharedMemCache.MemoryMapWrite(c.RouteString, key, data)
 
@@ -214,6 +226,12 @@ func (c *Cache) ValidateCache() {
 }
 
 func (c *Cache) PreloadMemoryMap() {
+	if c.SharedMemCache == nil {
+		msg := "SharedMemoryCache not set, cannot preload memory map"
+		c.logDebug(msg)
+		return
+	}
+
 	c.logInfo("Preloading cached tiles into memory map...")
 
 	start := time.Now()

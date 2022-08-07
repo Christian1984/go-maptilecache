@@ -47,28 +47,27 @@ func NewSharedMemoryCache(
 	return &m
 }
 
-/*
-// TODO: is this required at all? probably not...
-func (m *SharedMemoryCache) MemoryMapClear(mapKey string) {
-	m.InfoLogger("Clearing memory cache with mapKey [" + mapKey + "]")
-
-	m.MemoryMapMutex.Lock()
-	defer m.MemoryMapMutex.Unlock()
-
-	_, mapExists:= m.MemoryMaps[mapKey]
-
-	if !mapExists {
-		m.WarnLogger("Map with mapKey [" + mapKey + "] does not exist. Abort clearing...")
-		return
-
+func (m *SharedMemoryCache) log(message string, logFunc func(string)) {
+	if logFunc != nil {
+		logFunc(message)
 	}
-
-	// TODO: remove tiles from history, update cache size
-	newMap := make(map[string][]byte)
-	memoryMap := &MemoryMap{Tiles: &newMap}
-	m.MemoryMaps[mapKey] = memoryMap
 }
-*/
+
+func (m *SharedMemoryCache) logDebug(message string) {
+	m.log(message, m.DebugLogger)
+}
+
+func (m *SharedMemoryCache) logInfo(message string) {
+	m.log(message, m.InfoLogger)
+}
+
+func (m *SharedMemoryCache) logWarn(message string) {
+	m.log(message, m.WarnLogger)
+}
+
+func (m *SharedMemoryCache) logError(message string) {
+	m.log(message, m.ErrorLogger)
+}
 
 func (m *SharedMemoryCache) MemoryMapRead(mapKey string, tileKey string) ([]byte, bool) {
 	m.MemoryMapMutex.RLock()
@@ -104,9 +103,9 @@ func (m *SharedMemoryCache) MemoryMapWrite(mapKey string, tileKey string, data *
 
 			m.MemoryMapSize -= deleteSize
 
-			m.DebugLogger("MemoryMapWrite would exceed maximum capacity. Deleted tile with key [" + deleteKeys.TileKey + "] from MemoryMap [" + deleteKeys.MemoryMapKey + "], recovered " + strconv.Itoa(deleteSize) + " Bytes.")
+			m.logDebug("MemoryMapWrite would exceed maximum capacity. Deleted tile with key [" + deleteKeys.TileKey + "] from MemoryMap [" + deleteKeys.MemoryMapKey + "], recovered " + strconv.Itoa(deleteSize) + " Bytes.")
 		} else {
-			m.DebugLogger("MemoryMap with key [" + deleteKeys.MemoryMapKey + "] not found. Cannot delete tile to free up space...")
+			m.logDebug("MemoryMap with key [" + deleteKeys.MemoryMapKey + "] not found. Cannot delete tile to free up space...")
 		}
 	}
 
@@ -117,7 +116,7 @@ func (m *SharedMemoryCache) MemoryMapWrite(mapKey string, tileKey string, data *
 		newMap := make(map[string][]byte)
 		memoryMap = &MemoryMap{Tiles: &newMap}
 		m.MemoryMaps[mapKey] = memoryMap
-		m.DebugLogger("Memory Map with key [" + mapKey + "] did not exist. Created map!")
+		m.logDebug("Memory Map with key [" + mapKey + "] did not exist. Created map!")
 	}
 
 	prevData, existed := (*memoryMap.Tiles)[tileKey]
