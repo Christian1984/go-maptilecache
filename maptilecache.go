@@ -119,7 +119,7 @@ func (c *Cache) WipeCache() error {
 	return err
 }
 
-func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
+func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z string) (*[]byte, error) {
 	start := time.Now()
 	key := c.makeFilepath(requestParams, x, y, z).FullPath
 
@@ -129,7 +129,6 @@ func (c *Cache) memoryMapLoad(requestParams *url.Values, x string, y string, z s
 		return nil, errors.New(msg)
 	}
 
-	//data, exists := c.memoryMapRead(key)
 	data, exists := c.SharedMemCache.MemoryMapRead(c.RouteString, key)
 
 	duration := time.Since(start)
@@ -272,7 +271,7 @@ func (c *Cache) PreloadMemoryMap() {
 	c.logInfo(fmt.Sprintf("Cache data preloaded into memory! %d Bytes loaded, %d tiles stored, took %s)", totalSize, tilesStored, duration.String()))
 }
 
-func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) ([]byte, error) {
+func (c *Cache) request(x string, y string, z string, s string, params *url.Values, sourceHeader *http.Header) (*[]byte, error) {
 	start := time.Now()
 
 	url := c.UrlScheme
@@ -333,7 +332,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 
 	c.logDebug("Received " + strconv.Itoa(len(bodyBytes)) + " Bytes from " + url)
 
-	if !c.isValidTile(bodyBytes) {
+	if !c.isValidTile(&bodyBytes) {
 		length := len(bodyBytes)
 		if length > 20 {
 			length = 20
@@ -350,7 +349,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	duration := time.Since(start)
 	c.logDebug("Serving " + strconv.Itoa(len(bodyBytes)) + " Bytes to client (took " + duration.String() + ")")
 
-	return bodyBytes, nil
+	return &bodyBytes, nil
 }
 
 func (c *Cache) makeFilepath(requestParams *url.Values, x string, y string, z string) FilePath {
@@ -384,7 +383,7 @@ func isPathDangerous(path string) bool {
 	return trimmedPath == "" || trimmedPath == "/" || trimmedPath == "C:\\"
 }
 
-func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([]byte, error) {
+func (c *Cache) load(requestParams *url.Values, x string, y string, z string) (*[]byte, error) {
 	start := time.Now()
 
 	fp := c.makeFilepath(requestParams, x, y, z)
@@ -413,16 +412,16 @@ func (c *Cache) load(requestParams *url.Values, x string, y string, z string) ([
 	duration := time.Since(start)
 	c.logDebug("Loaded tile from " + fp.FullPath + " (took " + duration.String() + ")")
 
-	return data, nil
+	return &data, nil
 }
 
-func (c *Cache) isValidTile(bytes []byte) bool {
-	if len(bytes) < 4 {
+func (c *Cache) isValidTile(bytes *[]byte) bool {
+	if len(*bytes) < 4 {
 		c.logDebug("Tile invalid, response body was empty.")
 		return false
 	}
 
-	header := strings.ToLower(string(bytes[1:4]))
+	header := strings.ToLower(string((*bytes)[1:4]))
 	if header != "png" {
 		c.logDebug("Tile invalid, header != [PNG], got [" + header + "] instead")
 		return false
@@ -481,7 +480,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	params := req.URL.Query()
 	c.logDebug("Request params found : " + fmt.Sprint(params))
 
-	var data []byte
+	var data *[]byte
 	var err error
 
 	//c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*(c.SharedMemCache.MemoryMaps)[c.RouteString].Tiles)))
@@ -495,12 +494,12 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 			c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from HDD, will request it from server...")
 		} else {
 			c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in HDD-Storage!")
-			c.Stats.BytesServedFromHDD += len(data)
-			c.memoryMapStore(&params, x, y, z, &data)
+			c.Stats.BytesServedFromHDD += len(*data)
+			c.memoryMapStore(&params, x, y, z, data)
 		}
 	} else {
 		c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in MemoryMap!")
-		c.Stats.BytesServedFromMemory += len(data)
+		c.Stats.BytesServedFromMemory += len(*data)
 	}
 
 	if err != nil {
@@ -517,12 +516,12 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 			w.Write([]byte("Not found"))
 			return
 		} else {
-			c.logDebug("Fetched tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from server (" + strconv.Itoa(len(data)) + " Bytes)!")
-			c.Stats.BytesServedFromOrigin += len(data)
+			c.logDebug("Fetched tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from server (" + strconv.Itoa(len(*data)) + " Bytes)!")
+			c.Stats.BytesServedFromOrigin += len(*data)
 		}
 	} else {
-		c.logDebug("Loaded tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from cache (" + strconv.Itoa(len(data)) + " Bytes)!")
-		c.Stats.BytesServedFromCache += len(data)
+		c.logDebug("Loaded tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from cache (" + strconv.Itoa(len(*data)) + " Bytes)!")
+		c.Stats.BytesServedFromCache += len(*data)
 	}
 
 	//c.LogStats()
@@ -532,10 +531,10 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
 	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Header().Set("Content-Length", strconv.Itoa(len(*data)))
 
 	duration := time.Since(start)
 	c.logDebug("Processing request with RequestURI: [" + req.RequestURI + "] took " + duration.String())
 
-	w.Write(data)
+	w.Write(*data)
 }
