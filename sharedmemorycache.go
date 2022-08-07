@@ -11,18 +11,19 @@ type MemoryMap struct {
 	Mutex *sync.RWMutex
 }
 
-type MemoryMapKeyHistoyItem struct {
+type TileKeyHistoryItem struct {
 	MemoryMapKey string
 	TileKey      string
 }
 
 type SharedMemoryCache struct {
 	MemoryMaps            map[string]*MemoryMap
-	MemoryMapKeyHistory   []MemoryMapKeyHistoyItem
-	SharedMutex           *sync.RWMutex
-	MemoryMapHistoryMutex *sync.RWMutex
-	MemoryMapSize         int
-	MemoryMapMaxSize      int
+	TileKeyHistory        []TileKeyHistoryItem
+	MapMutes              *sync.RWMutex
+	HistoryMutex          *sync.RWMutex
+	SizeBytes             int
+	MaxSizeBytes          int
+	EnsureMaxSizeInterval time.Duration
 	DebugLogger           func(string)
 	InfoLogger            func(string)
 	WarnLogger            func(string)
@@ -30,39 +31,45 @@ type SharedMemoryCache struct {
 }
 
 type SharedMemoryCacheConfig struct {
-	MaxMemoryFootprint int
-	DebugLogger        func(string)
-	InfoLogger         func(string)
-	WarnLogger         func(string)
-	ErrorLogger        func(string)
+	MaxSizeBytes          int
+	EnsureMaxSizeInterval time.Duration
+	DebugLogger           func(string)
+	InfoLogger            func(string)
+	WarnLogger            func(string)
+	ErrorLogger           func(string)
 }
 
 func NewSharedMemoryCache(config SharedMemoryCacheConfig) *SharedMemoryCache {
 	m := SharedMemoryCache{
 		MemoryMaps:            make(map[string]*MemoryMap),
-		MemoryMapKeyHistory:   []MemoryMapKeyHistoyItem{},
-		SharedMutex:           &sync.RWMutex{},
-		MemoryMapHistoryMutex: &sync.RWMutex{},
-		MemoryMapMaxSize:      config.MaxMemoryFootprint,
+		TileKeyHistory:        []TileKeyHistoryItem{},
+		MapMutes:              &sync.RWMutex{},
+		HistoryMutex:          &sync.RWMutex{},
+		MaxSizeBytes:          config.MaxSizeBytes,
+		EnsureMaxSizeInterval: config.EnsureMaxSizeInterval,
 		DebugLogger:           config.DebugLogger,
 		InfoLogger:            config.InfoLogger,
 		WarnLogger:            config.WarnLogger,
 		ErrorLogger:           config.ErrorLogger,
 	}
 
-	ticker := time.NewTicker(30 * time.Second)
-	quit := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				m.EnsureMaxSize()
-			case <-quit:
-				ticker.Stop()
-				return
+	if m.EnsureMaxSizeInterval > 0 {
+		ticker := time.NewTicker(5 * time.Second)
+		quit := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					m.EnsureMaxSize()
+				case <-quit:
+					ticker.Stop()
+					return
+				}
 			}
-		}
-	}()
+		}()
+	} else if m.MaxSizeBytes > 0 {
+		m.logWarn("Memory Cache Max Size set, but ensure-interval to enforce size limit not set")
+	}
 
 	return &m
 }
@@ -122,39 +129,45 @@ func (mm *MemoryMap) removeTile(tileKey string) {
 }
 
 func (m *SharedMemoryCache) EnsureMaxSize() {
-	m.logDebug("EnsureMaxSize()  called...")
+	m.logDebug("EnsureMaxSize() called...")
+	start := time.Now()
 
-	m.MemoryMapHistoryMutex.Lock()
-	defer m.MemoryMapHistoryMutex.Unlock()
+	m.HistoryMutex.Lock()
+	defer m.HistoryMutex.Unlock()
 
-	for len(m.MemoryMapKeyHistory) > 0 && m.MemoryMapSize > m.MemoryMapMaxSize {
-		deleteKeys := m.MemoryMapKeyHistory[0]
-		m.MemoryMapKeyHistory = m.MemoryMapKeyHistory[1:]
+	deleteCount := 0
+	for len(m.TileKeyHistory) > 0 && m.SizeBytes > m.MaxSizeBytes {
+		deleteKeys := m.TileKeyHistory[0]
+		m.TileKeyHistory = m.TileKeyHistory[1:]
 
-		m.SharedMutex.RLock()
+		m.MapMutes.RLock()
 		deleteMemoryMap, deleteMapExisted := m.getMemoryMap(deleteKeys.MemoryMapKey)
-		m.SharedMutex.RUnlock()
+		m.MapMutes.RUnlock()
 
 		if deleteMapExisted {
 			deleteMemoryMap.Mutex.Lock()
 			deleteTile, _ := deleteMemoryMap.getTile(deleteKeys.TileKey)
 			deleteSize := len(*deleteTile)
+			m.SizeBytes -= deleteSize
 			deleteMemoryMap.removeTile(deleteKeys.TileKey)
 			deleteMemoryMap.Mutex.Unlock()
 
-			m.MemoryMapSize -= deleteSize
+			deleteCount++
 
 			m.logDebug("MemoryMapWrite would exceed maximum capacity. Deleted tile with key [" + deleteKeys.TileKey + "] from MemoryMap [" + deleteKeys.MemoryMapKey + "], recovered " + strconv.Itoa(deleteSize) + " Bytes.")
 		} else {
 			m.logDebug("MemoryMap with key [" + deleteKeys.MemoryMapKey + "] not found. Cannot delete tile to free up space...")
 		}
 	}
+
+	duration := time.Since(start)
+	m.logDebug("EnsureMaxSize() finished. Removed " + strconv.Itoa(deleteCount) + " tiles (took " + duration.String() + ").")
 }
 
 func (m *SharedMemoryCache) MemoryMapRead(mapKey string, tileKey string) (*[]byte, bool) {
-	m.SharedMutex.RLock()
+	m.MapMutes.RLock()
 	memoryMap, mapExists := m.getMemoryMap(mapKey)
-	m.SharedMutex.RUnlock()
+	m.MapMutes.RUnlock()
 
 	if !mapExists {
 		return nil, false
@@ -168,9 +181,9 @@ func (m *SharedMemoryCache) MemoryMapRead(mapKey string, tileKey string) (*[]byt
 }
 
 func (m *SharedMemoryCache) MemoryMapWrite(mapKey string, tileKey string, data *[]byte) {
-	m.SharedMutex.Lock()
+	m.MapMutes.Lock()
 	memoryMap := m.addMemoryMapIfNotExists(mapKey)
-	m.SharedMutex.Unlock()
+	m.MapMutes.Unlock()
 
 	memoryMap.Mutex.Lock()
 	prevData, _ := memoryMap.getTile(tileKey)
@@ -179,9 +192,9 @@ func (m *SharedMemoryCache) MemoryMapWrite(mapKey string, tileKey string, data *
 	memoryMap.addTile(tileKey, data)
 	memoryMap.Mutex.Unlock()
 
-	m.MemoryMapHistoryMutex.Lock()
-	m.MemoryMapSize -= oldDataSize
-	m.MemoryMapKeyHistory = append(m.MemoryMapKeyHistory, MemoryMapKeyHistoyItem{MemoryMapKey: mapKey, TileKey: tileKey})
-	m.MemoryMapSize += newDataSize
-	m.MemoryMapHistoryMutex.Unlock()
+	m.HistoryMutex.Lock()
+	m.SizeBytes -= oldDataSize
+	m.TileKeyHistory = append(m.TileKeyHistory, TileKeyHistoryItem{MemoryMapKey: mapKey, TileKey: tileKey})
+	m.SizeBytes += newDataSize
+	m.HistoryMutex.Unlock()
 }

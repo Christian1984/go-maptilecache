@@ -42,18 +42,18 @@ type Cache struct {
 }
 
 type CacheConfig struct {
-	Route           []string
-	UrlScheme       string
-	StructureParams []string
-	TimeToLiveDays  time.Duration
-	ForwardHeaders  bool
-	SharedMemCache  *SharedMemoryCache
-	ApiKey          string
-	DebugLogger     func(string)
-	InfoLogger      func(string)
-	WarnLogger      func(string)
-	ErrorLogger     func(string)
-	StatsLogDelay   time.Duration
+	Route             []string
+	UrlScheme         string
+	StructureParams   []string
+	TimeToLive        time.Duration
+	ForwardHeaders    bool
+	SharedMemoryCache *SharedMemoryCache
+	ApiKey            string
+	DebugLogger       func(string)
+	InfoLogger        func(string)
+	WarnLogger        func(string)
+	ErrorLogger       func(string)
+	StatsLogDelay     time.Duration
 }
 
 func New(config CacheConfig) (*Cache, error) {
@@ -66,9 +66,9 @@ func New(config CacheConfig) (*Cache, error) {
 		RouteString:     routeString,
 		UrlScheme:       config.UrlScheme,
 		StructureParams: config.StructureParams,
-		TimeToLive:      config.TimeToLiveDays,
+		TimeToLive:      config.TimeToLive,
 		ForwardHeaders:  config.ForwardHeaders,
-		SharedMemCache:  config.SharedMemCache,
+		SharedMemCache:  config.SharedMemoryCache,
 		ApiKey:          config.ApiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + routeString + "]",

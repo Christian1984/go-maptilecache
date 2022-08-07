@@ -66,25 +66,26 @@ func main() {
 	ttl := 10 * 24 * time.Hour
 
 	sharedMemoryCacheConfig := maptilecache.SharedMemoryCacheConfig{
-		MaxMemoryFootprint: maxMemoryFootprint,
-		DebugLogger:        maptilecache.PrintlnDebugLogger,
-		InfoLogger:         maptilecache.PrintlnInfoLogger,
-		WarnLogger:         maptilecache.PrintlnWarnLogger,
-		ErrorLogger:        maptilecache.PrintlnErrorLogger,
+		MaxSizeBytes:          maxMemoryFootprint,
+		EnsureMaxSizeInterval: 10 * time.Second,
+		DebugLogger:           maptilecache.PrintlnDebugLogger,
+		InfoLogger:            maptilecache.PrintlnInfoLogger,
+		WarnLogger:            maptilecache.PrintlnWarnLogger,
+		ErrorLogger:           maptilecache.PrintlnErrorLogger,
 	}
 	sharedMemoryCache := maptilecache.NewSharedMemoryCache(sharedMemoryCacheConfig)
 
 	osmCacheConfig := maptilecache.CacheConfig{
-		Route:          []string{"maptilecache", "osm"},
-		UrlScheme:      "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-		TimeToLiveDays: ttl,
-		ForwardHeaders: true,
-		SharedMemCache: sharedMemoryCache,
-		DebugLogger:    maptilecache.PrintlnDebugLogger,
-		InfoLogger:     maptilecache.PrintlnInfoLogger,
-		WarnLogger:     maptilecache.PrintlnWarnLogger,
-		ErrorLogger:    maptilecache.PrintlnErrorLogger,
-		StatsLogDelay:  statsLogDelay,
+		Route:             []string{"maptilecache", "osm"},
+		UrlScheme:         "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+		TimeToLive:        ttl,
+		ForwardHeaders:    true,
+		SharedMemoryCache: sharedMemoryCache,
+		DebugLogger:       maptilecache.PrintlnDebugLogger,
+		InfoLogger:        maptilecache.PrintlnInfoLogger,
+		WarnLogger:        maptilecache.PrintlnWarnLogger,
+		ErrorLogger:       maptilecache.PrintlnErrorLogger,
+		StatsLogDelay:     statsLogDelay,
 	}
 	osmCache, err := maptilecache.New(osmCacheConfig)
 
@@ -94,16 +95,16 @@ func main() {
 	}
 
 	otmCacheConfig := maptilecache.CacheConfig{
-		Route:          []string{"maptilecache", "otm"},
-		UrlScheme:      "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-		TimeToLiveDays: ttl,
-		ForwardHeaders: true,
-		SharedMemCache: sharedMemoryCache,
-		DebugLogger:    maptilecache.PrintlnDebugLogger,
-		InfoLogger:     maptilecache.PrintlnInfoLogger,
-		WarnLogger:     maptilecache.PrintlnWarnLogger,
-		ErrorLogger:    maptilecache.PrintlnErrorLogger,
-		StatsLogDelay:  statsLogDelay,
+		Route:             []string{"maptilecache", "otm"},
+		UrlScheme:         "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+		TimeToLive:        ttl,
+		ForwardHeaders:    true,
+		SharedMemoryCache: sharedMemoryCache,
+		DebugLogger:       maptilecache.PrintlnDebugLogger,
+		InfoLogger:        maptilecache.PrintlnInfoLogger,
+		WarnLogger:        maptilecache.PrintlnWarnLogger,
+		ErrorLogger:       maptilecache.PrintlnErrorLogger,
+		StatsLogDelay:     statsLogDelay,
 	}
 	otmcache, err := maptilecache.New(otmCacheConfig)
 
@@ -113,32 +114,32 @@ func main() {
 	}
 
 	oaipAirportsCacheConfig := maptilecache.CacheConfig{
-		Route:          []string{"maptilecache", "oaip-airports"},
-		UrlScheme:      "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
-		TimeToLiveDays: ttl,
-		ForwardHeaders: false, // required for openAIP
-		SharedMemCache: sharedMemoryCache,
-		ApiKey:         secrets.OAPI_API_KEY,
-		DebugLogger:    maptilecache.PrintlnDebugLogger,
-		InfoLogger:     maptilecache.PrintlnInfoLogger,
-		WarnLogger:     maptilecache.PrintlnWarnLogger,
-		ErrorLogger:    maptilecache.PrintlnErrorLogger,
-		StatsLogDelay:  statsLogDelay,
+		Route:             []string{"maptilecache", "oaip-airports"},
+		UrlScheme:         "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
+		TimeToLive:        ttl,
+		ForwardHeaders:    false, // required for openAIP
+		SharedMemoryCache: sharedMemoryCache,
+		ApiKey:            secrets.OAPI_API_KEY,
+		DebugLogger:       maptilecache.PrintlnDebugLogger,
+		InfoLogger:        maptilecache.PrintlnInfoLogger,
+		WarnLogger:        maptilecache.PrintlnWarnLogger,
+		ErrorLogger:       maptilecache.PrintlnErrorLogger,
+		StatsLogDelay:     statsLogDelay,
 	}
 	maptilecache.New(oaipAirportsCacheConfig)
 
 	oaipAirspacesCacheConfig := maptilecache.CacheConfig{
-		Route:          []string{"maptilecache", "oaip-airspaces"},
-		UrlScheme:      "https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey={apiKey}",
-		TimeToLiveDays: ttl,
-		ForwardHeaders: false, // required for openAIP
-		SharedMemCache: sharedMemoryCache,
-		ApiKey:         secrets.OAPI_API_KEY,
-		DebugLogger:    maptilecache.PrintlnDebugLogger,
-		InfoLogger:     maptilecache.PrintlnInfoLogger,
-		WarnLogger:     maptilecache.PrintlnWarnLogger,
-		ErrorLogger:    maptilecache.PrintlnErrorLogger,
-		StatsLogDelay:  statsLogDelay,
+		Route:             []string{"maptilecache", "oaip-airspaces"},
+		UrlScheme:         "https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey={apiKey}",
+		TimeToLive:        ttl,
+		ForwardHeaders:    false, // required for openAIP
+		SharedMemoryCache: sharedMemoryCache,
+		ApiKey:            secrets.OAPI_API_KEY,
+		DebugLogger:       maptilecache.PrintlnDebugLogger,
+		InfoLogger:        maptilecache.PrintlnInfoLogger,
+		WarnLogger:        maptilecache.PrintlnWarnLogger,
+		ErrorLogger:       maptilecache.PrintlnErrorLogger,
+		StatsLogDelay:     statsLogDelay,
 	}
 	maptilecache.New(oaipAirspacesCacheConfig)
 
