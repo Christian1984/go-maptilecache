@@ -61,19 +61,22 @@ func main() {
 	httpListen := "0.0.0.0:9001"
 	statsLogDelay := 0 * time.Second
 
-	maxMemoryFootprint := 1024 * 1024 * 4 // 4 MB
-	//maxMemoryFootprint := 1024 * 1024 * 256 // 256 MB
 	ttl := 10 * 24 * time.Hour
+	/*
+		maxMemoryFootprint := 1024 * 1024 * 4 // 4 MB
+		//maxMemoryFootprint := 1024 * 1024 * 256 // 256 MB
 
-	sharedMemoryCacheConfig := maptilecache.SharedMemoryCacheConfig{
-		MaxSizeBytes:          maxMemoryFootprint,
-		EnsureMaxSizeInterval: 10 * time.Second,
-		DebugLogger:           maptilecache.PrintlnDebugLogger,
-		InfoLogger:            maptilecache.PrintlnInfoLogger,
-		WarnLogger:            maptilecache.PrintlnWarnLogger,
-		ErrorLogger:           maptilecache.PrintlnErrorLogger,
-	}
-	sharedMemoryCache := maptilecache.NewSharedMemoryCache(sharedMemoryCacheConfig)
+			sharedMemoryCacheConfig := maptilecache.SharedMemoryCacheConfig{
+				MaxSizeBytes:          maxMemoryFootprint,
+				EnsureMaxSizeInterval: 10 * time.Second,
+				DebugLogger:           maptilecache.PrintlnDebugLogger,
+				InfoLogger:            maptilecache.PrintlnInfoLogger,
+				WarnLogger:            maptilecache.PrintlnWarnLogger,
+				ErrorLogger:           maptilecache.PrintlnErrorLogger,
+			}
+			sharedMemoryCache := maptilecache.NewSharedMemoryCache(sharedMemoryCacheConfig)
+	*/
+	var sharedMemoryCache *maptilecache.SharedMemoryCache = nil
 
 	osmCacheConfig := maptilecache.CacheConfig{
 		Route:             []string{"maptilecache", "osm"},

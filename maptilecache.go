@@ -330,13 +330,18 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	c.logDebug("Requesting tile from " + req.URL.RequestURI())
 	c.logDebug(fmt.Sprintf("Request Headers: %s", req.Header))
 
+	requestStart := time.Now()
+	c.logDebug("Starting request at [" + requestStart.String() + "]")
+
 	resp, err := c.Client.Do(req)
+
+	requestDuration := time.Since(requestStart)
+	c.logDebug("Request from [" + requestStart.String() + "] finished (took " + requestDuration.String() + ").")
 
 	if err != nil {
 		c.logError("Could not request tile, reason: " + err.Error())
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		c.logError("Could not request tile, bad status code: " + strconv.Itoa(resp.StatusCode))
@@ -344,6 +349,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
 
 	if err != nil {
 		c.logError("Could parse response body, reason: " + err.Error())
