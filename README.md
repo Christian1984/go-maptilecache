@@ -22,7 +22,7 @@ Instead of configuring your mapping library (like leaflet, for example) to fetch
 For example, if you had previously configured a leaflet tile layer in your JavaScript like this
 
 ```
-const osm = new L.TileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+const osm = new L.TileLayer("https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey=<...>", {
     format: "image/png",
     subdomains: ["a", "b", "c"]
 });
@@ -31,7 +31,7 @@ const osm = new L.TileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 you would now point it at your go-maptilecache instance by configuring it like this
 
 ```
-const osm = new L.TileLayer("http://localhost:9001/maptilecache/osm/{s}/{z}/{y}/{x}/", {
+const osm = new L.TileLayer("http://localhost:9001/maptilecache/oaip-airports/{s}/{z}/{y}/{x}/", {
     format: "image/png",
     subdomains: ["a", "b", "c"]
 });
@@ -109,7 +109,7 @@ Now configure your cache like this
 ofmCacheConfig := maptilecache.CacheConfig{
 	Route:             []string{"maptilecache", "ofm"},
 	UrlScheme:         "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png",
-    []string{"path"}, // <= expected query parameters
+    StructureParams:   []string{"path"}, // <= expected query parameters
     /* ... */
 }
 maptilecache.New(ofmCacheConfig)
