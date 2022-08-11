@@ -252,13 +252,17 @@ func (c *Cache) PreloadMemoryMap() {
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			totalSize += info.Size()
-			tilesStored++
 			data, err := ioutil.ReadFile(path)
 
 			if err != nil {
 				c.logWarn("Could not preload file " + path + ", reason: " + err.Error())
 			} else {
+				if c.SharedMemCache.MaxSizeReachedMutex() {
+					return errors.New("SharedMemoryCache exceeded its max size during preload... Preload aborted after " + strconv.Itoa(tilesStored) + " tiles.")
+				}
+
 				c.SharedMemCache.MemoryMapWrite(c.RouteString, path, &data)
+				tilesStored++
 				c.logDebug("Preloaded " + strconv.Itoa(len(data)) + " bytes from file " + path + " into MemoryMap [" + c.RouteString + "] with tileKey [" + path + "].")
 			}
 		}

@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const MAX_SIZE_BYTES_UNLIMITED = -1
+
 type MemoryMap struct {
 	Tiles *map[string][]byte
 	Mutex *sync.RWMutex
@@ -53,8 +55,19 @@ func NewSharedMemoryCache(config SharedMemoryCacheConfig) *SharedMemoryCache {
 		ErrorLogger:           config.ErrorLogger,
 	}
 
-	if m.EnsureMaxSizeInterval > 0 {
-		ticker := time.NewTicker(5 * time.Second)
+	if m.MaxSizeBytes < 0 {
+		m.MaxSizeBytes = MAX_SIZE_BYTES_UNLIMITED
+		m.logWarn("Memory Cache initialized without size limit! Cache can grow excessively!")
+	} else if m.MaxSizeBytes == 0 {
+		m.logWarn("Memory Cache initialized with MaxSizeBytes == 0. Cache will not be used...")
+	}
+
+	if m.EnsureMaxSizeInterval <= 0 && m.MaxSizeBytes > 0 {
+		m.logWarn("Memory Cache MaxByteSize set, but ensure-interval to enforce size limit not set.")
+	}
+
+	if m.EnsureMaxSizeInterval > 0 && m.MaxSizeBytes > 0 {
+		ticker := time.NewTicker(m.EnsureMaxSizeInterval)
 		quit := make(chan struct{})
 		go func() {
 			for {
@@ -67,8 +80,6 @@ func NewSharedMemoryCache(config SharedMemoryCacheConfig) *SharedMemoryCache {
 				}
 			}
 		}()
-	} else if m.MaxSizeBytes > 0 {
-		m.logWarn("Memory Cache Max Size set, but ensure-interval to enforce size limit not set")
 	}
 
 	return &m
@@ -128,6 +139,21 @@ func (mm *MemoryMap) removeTile(tileKey string) {
 	delete(*mm.Tiles, tileKey)
 }
 
+func (m *SharedMemoryCache) MaxSizeReachedMutex() bool {
+	m.HistoryMutex.RLock()
+	defer m.HistoryMutex.RUnlock()
+
+	return m.maxSizeReached()
+}
+
+func (m *SharedMemoryCache) maxSizeReached() bool {
+	if m.MaxSizeBytes <= MAX_SIZE_BYTES_UNLIMITED {
+		return false
+	}
+
+	return len(m.TileKeyHistory) > 0 && m.SizeBytes >= m.MaxSizeBytes
+}
+
 func (m *SharedMemoryCache) EnsureMaxSize() {
 	m.logDebug("EnsureMaxSize() called...")
 	start := time.Now()
@@ -136,7 +162,7 @@ func (m *SharedMemoryCache) EnsureMaxSize() {
 	defer m.HistoryMutex.Unlock()
 
 	deleteCount := 0
-	for len(m.TileKeyHistory) > 0 && m.SizeBytes > m.MaxSizeBytes {
+	for m.maxSizeReached() {
 		deleteKeys := m.TileKeyHistory[0]
 		m.TileKeyHistory = m.TileKeyHistory[1:]
 
