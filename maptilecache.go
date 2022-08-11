@@ -16,6 +16,8 @@ import (
 	"github.com/djherbis/times"
 )
 
+const DEFAULT_HTTP_CLIENT_TIMEOUT = 2 * time.Second
+
 type FilePath struct {
 	Path     string
 	FullPath string
@@ -49,6 +51,7 @@ type CacheConfig struct {
 	TimeToLive        time.Duration
 	ForwardHeaders    bool
 	SharedMemoryCache *SharedMemoryCache
+	HttpClientTimeout time.Duration
 	ApiKey            string
 	DebugLogger       func(string)
 	InfoLogger        func(string)
@@ -62,6 +65,12 @@ func New(config CacheConfig) (*Cache, error) {
 
 	routeString := routeString(config.Route)
 
+	timeout := config.HttpClientTimeout
+
+	if config.HttpClientTimeout <= 0 {
+		timeout = DEFAULT_HTTP_CLIENT_TIMEOUT
+	}
+
 	c := Cache{
 		Route:           config.Route,
 		RouteString:     routeString,
@@ -70,7 +79,7 @@ func New(config CacheConfig) (*Cache, error) {
 		TimeToLive:      config.TimeToLive,
 		ForwardHeaders:  config.ForwardHeaders,
 		SharedMemCache:  config.SharedMemoryCache,
-		Client:          &http.Client{},
+		Client:          &http.Client{Timeout: timeout},
 		ApiKey:          config.ApiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + routeString + "]",
@@ -81,6 +90,8 @@ func New(config CacheConfig) (*Cache, error) {
 			StatsLogDelay: config.StatsLogDelay,
 		},
 	}
+
+	c.logDebug("Timeout: " + timeout.String())
 
 	if len(config.Route) < 1 {
 		return &c, errors.New("could not initialize cache, reason: route invalid, must have at least one entry")
