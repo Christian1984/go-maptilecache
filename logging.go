@@ -30,8 +30,12 @@ func (c *Cache) log(message string, logFunc func(string)) {
 }
 
 // Default Logger
+func logString(level string, message string) string {
+	return time.Now().Local().Format("2006-01-02T15-04-05") + " [" + level + "] " + message
+}
+
 func println(level string, message string) {
-	fmt.Println("[" + level + "] " + message)
+	fmt.Println(logString(level, message))
 }
 
 func PrintlnDebugLogger(message string) {
