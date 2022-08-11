@@ -36,6 +36,7 @@ type Cache struct {
 	TimeToLive      time.Duration
 	ForwardHeaders  bool
 	SharedMemCache  *SharedMemoryCache
+	Client          *http.Client
 	ApiKey          string
 	Stats           CacheStats
 	Logger          LoggerConfig
@@ -69,6 +70,7 @@ func New(config CacheConfig) (*Cache, error) {
 		TimeToLive:      config.TimeToLive,
 		ForwardHeaders:  config.ForwardHeaders,
 		SharedMemCache:  config.SharedMemoryCache,
+		Client:          &http.Client{},
 		ApiKey:          config.ApiKey,
 		Logger: LoggerConfig{
 			LogPrefix:     "Cache[" + routeString + "]",
@@ -317,8 +319,7 @@ func (c *Cache) request(x string, y string, z string, s string, params *url.Valu
 	c.logDebug("Requesting tile from " + req.URL.RequestURI())
 	c.logDebug(fmt.Sprintf("Request Headers: %s", req.Header))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.Client.Do(req)
 
 	if err != nil {
 		c.logError("Could not request tile, reason: " + err.Error())
