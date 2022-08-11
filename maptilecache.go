@@ -494,11 +494,11 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	//c.logDebug("Trying to load tile, total numbers tiles in this cache's memory map: " + strconv.Itoa(len(*(c.SharedMemCache.MemoryMaps)[c.RouteString].Tiles)))
 	data, err = c.memoryMapLoad(&params, x, y, z)
 
-	if err != nil {
+	if err != nil || data == nil {
 		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from MemoryMap, will try HDD...")
 		data, err = c.load(&params, x, y, z)
 
-		if err != nil {
+		if err != nil || data == nil {
 			c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] from HDD, will request it from server...")
 		} else {
 			c.logDebug("Tile for x=[" + x + "], y=[" + y + "], z=[" + z + "] found in HDD-Storage!")
@@ -510,15 +510,21 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		c.Stats.BytesServedFromMemory += len(*data)
 	}
 
-	if err != nil {
-		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + err.Error())
+	if err != nil || data == nil {
+		errString := "data == nil"
+
+		if err != nil {
+			errString = err.Error()
+		}
+
+		c.logDebug("Could not load tile for x=[" + x + "], y=[" + y + "], z=[" + z + "], reason: " + errString)
 		c.logDebug("Sending request to server...")
 
 		sourceHeader := req.Header.Clone()
 
 		data, err = c.request(x, y, z, s, &params, &sourceHeader)
 
-		if err != nil {
+		if err != nil || data == nil {
 			c.logWarn("Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("Not found"))
