@@ -1,4 +1,4 @@
-module github.com/Christian1984/go-maptilecache
+module github.com/Christian1984/go-maptilecache/v2
 
 go 1.14
 
