@@ -52,21 +52,33 @@ import (
 )
 
 func main() {
-    maptilecache.New(
-        []string{"maptilecache", "osm"},                     // route
-        "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", // provider url
-        []string{},                                          // expected query parameters 
-                                                             // for additional cache organization
-        90*24*time.Hour,                                     // time to live
-        512 * 1024 * 1024                                    // max memory footprint in bytes
-        "",                                                  // API key
-        maptilecache.PrintlnDebugLogger,                     // logger callbacks
-        maptilecache.PrintlnInfoLogger,
-        maptilecache.PrintlnWarnLogger,
-        maptilecache.PrintlnErrorLogger,
-        30*time.Second,                                      // delay for stats logging
-    )
-    http.ListenAndServe("0.0.0.0:9001", nil)
+    // create an in-memory cache that can be shared across multiple maptile caches
+	sharedMemoryCacheConfig := maptilecache.SharedMemoryCacheConfig{
+		MaxSizeBytes:          256 * 1024 * 1024,
+		EnsureMaxSizeInterval: 10 * time.Second,
+		DebugLogger:           maptilecache.PrintlnDebugLogger,
+		InfoLogger:            maptilecache.PrintlnInfoLogger,
+		WarnLogger:            maptilecache.PrintlnWarnLogger,
+		ErrorLogger:           maptilecache.PrintlnErrorLogger,
+	}
+	sharedMemoryCache := maptilecache.NewSharedMemoryCache(sharedMemoryCacheConfig)
+
+    // create one or more maptile caches
+	oaipAirportsCacheConfig := maptilecache.CacheConfig{
+		Route:             []string{"maptilecache", "oaip-airports"},
+		UrlScheme:         "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
+		TimeToLive:        10 * 24 * time.Hour,
+		ForwardHeaders:    false, // required for openAIP, default treu works for most APIs
+		SharedMemoryCache: sharedMemoryCache,
+		ApiKey:            secrets.OAPI_API_KEY,
+		DebugLogger:       maptilecache.PrintlnDebugLogger,
+		InfoLogger:        maptilecache.PrintlnInfoLogger,
+		WarnLogger:        maptilecache.PrintlnWarnLogger,
+		ErrorLogger:       maptilecache.PrintlnErrorLogger,
+		StatsLogDelay:     1 * time.Hour,
+	}
+	maptilecache.New(oaipAirportsCacheConfig)
+    http.ListenAndServe("localhost:9001", nil)
 }
 
 ```
@@ -94,12 +106,13 @@ http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2200/aero/latest
 Now configure your cache like this
 
 ```
-maptilecache.New(
-    []string{"maptilecache", "ofm"}, 
-    "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png",
+ofmCacheConfig := maptilecache.CacheConfig{
+	Route:             []string{"maptilecache", "ofm"},
+	UrlScheme:         "https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png",
     []string{"path"}, // <= expected query parameters
     /* ... */
-)
+}
+maptilecache.New(ofmCacheConfig)
 ```
 
 The cache will forward the `path` param to the server and will organize all locally cached tiles according to the AIRAC cycle. The folder structure would then look like this: `maptilecache/ofm/{AIRAC-cycle}/z/y/x.png`
