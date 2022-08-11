@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Christian1984/go-maptilecache/v2"
-	"github.com/Christian1984/go-maptilecache/v2/example/cache/secrets"
+	"github.com/Christian1984/go-maptilecache"
+	"github.com/Christian1984/go-maptilecache/example/cache/secrets"
 )
 
 func sendTestRequest(url string) {

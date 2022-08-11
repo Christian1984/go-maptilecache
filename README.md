@@ -48,7 +48,7 @@ import (
     "net/http"
     "time"
 
-    "github.com/Christian1984/go-maptilecache/v2"
+    "github.com/Christian1984/go-maptilecache"
 )
 
 func main() {
