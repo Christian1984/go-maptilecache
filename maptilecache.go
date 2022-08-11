@@ -32,6 +32,7 @@ type CacheStats struct {
 }
 
 type Cache struct {
+	Port            string
 	Route           []string
 	RouteString     string
 	UrlScheme       string
@@ -46,6 +47,7 @@ type Cache struct {
 }
 
 type CacheConfig struct {
+	Port              string
 	Route             []string
 	UrlScheme         string
 	StructureParams   []string
@@ -73,6 +75,7 @@ func New(config CacheConfig) (*Cache, error) {
 	}
 
 	c := Cache{
+		Port:            config.Port,
 		Route:           config.Route,
 		RouteString:     routeString,
 		UrlScheme:       config.UrlScheme,
@@ -492,9 +495,9 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 
 	c.logDebug(requestIdPrefix + "Received request with RequestURI [" + req.RequestURI + "]")
 
-	// c.logDebug(requestIdPrefix + "Enter Sleep")
-	// time.Sleep(10 * time.Second)
-	// c.logDebug(requestIdPrefix + "Sleep done!")
+	c.logDebug(requestIdPrefix + "Enter Sleep")
+	time.Sleep(3 * time.Second)
+	c.logDebug(requestIdPrefix + "Sleep done!")
 
 	requestPath := strings.Split(req.URL.Path, "/")
 

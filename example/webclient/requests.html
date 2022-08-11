@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div></div>
+    <script>
+        const log = (msg, div) => {
+                console.log(msg);
+
+                if (div) {
+                    div.innerHTML = "<p>" + msg + "</p>" + div.innerHTML;
+                }
+        }
+
+        const sendRequest = async (i, url, div) => {
+            try {
+                let out = "Request " + i +" => ";
+
+                const response = await fetch(url);
+                out += "status: " + response.status + ", headers: ("
+                for (var pair of response.headers.entries()) {
+                    out += pair[0]+ ": " + pair[1] + ", ";
+                }
+                out += ")";
+                log(out, div);
+            }
+            catch (e) {
+                console.error(e)
+            }
+        }
+
+        console.log(location);
+
+        const div = document.querySelector("div");
+
+        const hostArr = location.host.split(":");
+        if (hostArr.length > 1) {
+            const hostAddr = hostArr[0];
+            const port = hostArr[1];
+
+            const loc = location.protocol + "//" + hostAddr;
+            log("loc: " + loc);
+            
+            for (let i = 0; i < 30; i++) {
+                sendRequest(i, loc + ":9001/maptilecache/osm/a/10/347/541/", div);
+                sendRequest(i, loc + ":9001/maptilecache/oaip-airports/a/10/347/541/", div);
+            }
+        }
+    </script>
+</body>
+</html>
