@@ -65,6 +65,7 @@ func main() {
 
     // create one or more maptile caches
 	oaipAirportsCacheConfig := maptilecache.CacheConfig{
+		Port:              "9001"
 		Route:             []string{"maptilecache", "oaip-airports"},
 		UrlScheme:         "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
 		TimeToLive:        10 * 24 * time.Hour,
@@ -78,7 +79,6 @@ func main() {
 		StatsLogDelay:     1 * time.Hour,
 	}
 	maptilecache.New(oaipAirportsCacheConfig)
-    http.ListenAndServe("localhost:9001", nil)
 }
 
 ```

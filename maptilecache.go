@@ -308,13 +308,13 @@ func (c *Cache) request(requestIdPrefix string, x string, y string, z string, s 
 	url = strings.Replace(url, "{z}", z, 1)
 
 	if strings.Contains(c.UrlScheme, "{apiKey}") && strings.TrimSpace(c.ApiKey) == "" {
-		c.logWarn("Trying to replace {apiKey}, but ApiKey is not configured!")
+		c.logWarn(requestIdPrefix + "Trying to replace {apiKey}, but ApiKey is not configured!")
 	}
 	url = strings.Replace(url, "{apiKey}", c.ApiKey, 1)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		c.logError("Could not create request, reason: " + err.Error())
+		c.logError(requestIdPrefix + "Could not create request, reason: " + err.Error())
 		return nil, err
 	}
 
@@ -345,12 +345,12 @@ func (c *Cache) request(requestIdPrefix string, x string, y string, z string, s 
 	c.logDebug(requestIdPrefix + "Request from [" + requestStart.String() + "] finished (took " + requestDuration.String() + ").")
 
 	if err != nil {
-		c.logError("Could not request tile, reason: " + err.Error())
+		c.logError(requestIdPrefix + "Could not request tile, reason: " + err.Error())
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		c.logError("Could not request tile, bad status code: " + strconv.Itoa(resp.StatusCode))
+		c.logError(requestIdPrefix + "Could not request tile, bad status code: " + strconv.Itoa(resp.StatusCode))
 		return nil, err
 	}
 
@@ -358,7 +358,7 @@ func (c *Cache) request(requestIdPrefix string, x string, y string, z string, s 
 	resp.Body.Close()
 
 	if err != nil {
-		c.logError("Could parse response body, reason: " + err.Error())
+		c.logError(requestIdPrefix + "Could parse response body, reason: " + err.Error())
 		return nil, err
 	}
 
@@ -472,13 +472,13 @@ func (c *Cache) save(requestIdPrefix string, requestParams *url.Values, x string
 	dirErr := os.MkdirAll(fp.Path, os.ModePerm)
 
 	if dirErr != nil {
-		c.logError("Could not save tile, reason: " + dirErr.Error())
+		c.logError(requestIdPrefix + "Could not save tile, reason: " + dirErr.Error())
 		return dirErr
 	}
 	fileErr := ioutil.WriteFile(fp.FullPath, *data, 0644)
 
 	if fileErr != nil {
-		c.logError("Could not save tile, reason: " + fileErr.Error())
+		c.logError(requestIdPrefix + "Could not save tile, reason: " + fileErr.Error())
 		return fileErr
 	}
 
@@ -504,7 +504,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 	requestPath := strings.Split(req.URL.Path, "/")
 
 	if len(requestPath) < 5+len(c.Route) {
-		c.logError("Bad Request: Not enough arguments in route [" + req.RequestURI + "]")
+		c.logError(requestIdPrefix + "Bad Request: Not enough arguments in route [" + req.RequestURI + "]")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Bad Request"))
 		return
@@ -557,7 +557,7 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 		data, err = c.request(requestIdPrefix, x, y, z, s, &params, &sourceHeader)
 
 		if err != nil || data == nil {
-			c.logWarn("Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")
+			c.logWarn(requestIdPrefix + "Could not fetch tile for x=[" + x + "], y=[" + y + "], z=[" + z + "].")
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("Not found"))
 			return
