@@ -58,7 +58,6 @@ func initTestEndpoint() {
 */
 
 func main() {
-	httpListen := "0.0.0.0:9001"
 	statsLogDelay := 0 * time.Second
 
 	ttl := 10 * 24 * time.Hour
@@ -79,6 +78,7 @@ func main() {
 	var sharedMemoryCache *maptilecache.SharedMemoryCache = nil
 
 	osmCacheConfig := maptilecache.CacheConfig{
+		Port:              "9002",
 		Route:             []string{"maptilecache", "osm"},
 		UrlScheme:         "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 		TimeToLive:        ttl,
@@ -98,6 +98,7 @@ func main() {
 	}
 
 	otmCacheConfig := maptilecache.CacheConfig{
+		Port:              "9003",
 		Route:             []string{"maptilecache", "otm"},
 		UrlScheme:         "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
 		TimeToLive:        ttl,
@@ -117,6 +118,7 @@ func main() {
 	}
 
 	oaipAirportsCacheConfig := maptilecache.CacheConfig{
+		Port:              "9004",
 		Route:             []string{"maptilecache", "oaip-airports"},
 		UrlScheme:         "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
 		TimeToLive:        ttl,
@@ -132,6 +134,7 @@ func main() {
 	maptilecache.New(oaipAirportsCacheConfig)
 
 	oaipAirspacesCacheConfig := maptilecache.CacheConfig{
+		Port:              "9005",
 		Route:             []string{"maptilecache", "oaip-airspaces"},
 		UrlScheme:         "https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey={apiKey}",
 		TimeToLive:        ttl,
@@ -146,8 +149,21 @@ func main() {
 	}
 	maptilecache.New(oaipAirspacesCacheConfig)
 
-	go http.ListenAndServe(httpListen, nil)
-	fmt.Println("Map Tile Cache listening at " + httpListen)
+	oaipNavaidsCacheConfig := maptilecache.CacheConfig{
+		Port:              "9006",
+		Route:             []string{"maptilecache", "oaip-navaids"},
+		UrlScheme:         "https://api.tiles.openaip.net/api/data/navaids/{z}/{x}/{y}.png?apiKey={apiKey}",
+		TimeToLive:        ttl,
+		ForwardHeaders:    false, // required for openAIP
+		SharedMemoryCache: sharedMemoryCache,
+		ApiKey:            secrets.OAPI_API_KEY,
+		DebugLogger:       maptilecache.PrintlnDebugLogger,
+		InfoLogger:        maptilecache.PrintlnInfoLogger,
+		WarnLogger:        maptilecache.PrintlnWarnLogger,
+		ErrorLogger:       maptilecache.PrintlnErrorLogger,
+		StatsLogDelay:     statsLogDelay,
+	}
+	maptilecache.New(oaipNavaidsCacheConfig)
 
 	time.Sleep(1 * time.Second)
 	//testOne()

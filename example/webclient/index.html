@@ -34,7 +34,7 @@
 
         const map_resolution = map_resolutions.high;
 
-        const osmc = new L.TileLayer("http://localhost:9001/maptilecache/osm/{s}/{z}/{y}/{x}/", {
+        const osmc = new L.TileLayer("http://localhost:9002/maptilecache/osm/{s}/{z}/{y}/{x}/", {
             maxZoom: 18,
             minZoom: 2,
             tileSize: map_resolution.tile_size,
@@ -52,7 +52,7 @@
             subdomains: ["a", "b", "c"]
         });
 
-        const otmc = new L.TileLayer("http://localhost:9001/maptilecache/otm/{s}/{z}/{y}/{x}/", {
+        const otmc = new L.TileLayer("http://localhost:9003/maptilecache/otm/{s}/{z}/{y}/{x}/", {
             maxZoom: 18,
             minZoom: 2,
             tileSize: map_resolution.tile_size,
@@ -61,7 +61,7 @@
             subdomains: ["a", "b", "c"]
         });
 
-        const oaipc_airports = new L.TileLayer("http://localhost:9001/maptilecache/oaip-airports/{s}/{z}/{y}/{x}/", {
+        const oaipc_airports = new L.TileLayer("http://localhost:9004/maptilecache/oaip-airports/{s}/{z}/{y}/{x}/", {
             maxZoom: 14,
             minZoom: 4,
             tileSize: map_resolution.tile_size,
@@ -72,7 +72,7 @@
             transparent: true
         });
 
-        const oaipc_airspaces = new L.TileLayer("http://localhost:9001/maptilecache/oaip-airspaces/{s}/{z}/{y}/{x}/", {
+        const oaipc_airspaces = new L.TileLayer("http://localhost:9005/maptilecache/oaip-airspaces/{s}/{z}/{y}/{x}/", {
             maxZoom: 14,
             minZoom: 4,
             tileSize: map_resolution.tile_size,
@@ -83,7 +83,7 @@
             transparent: true
         });
 
-        const oaipc_airspaces_uncached = new L.TileLayer("https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey=", {
+        const oaipc_navaids = new L.TileLayer("http://localhost:9006/maptilecache/oaip-navaids/{s}/{z}/{y}/{x}/", {
             maxZoom: 14,
             minZoom: 4,
             tileSize: map_resolution.tile_size,
@@ -94,31 +94,6 @@
             transparent: true
         });
 
-
-        const ofmc2206 = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2206/aero/latest", {
-            maxZoom: 18,
-            minZoom: 2,
-            tileSize: map_resolution.tile_size,
-            zoomOffset: map_resolution.zoom_offset,
-            format: "image/png"
-        });
-
-        const ofmc2207 = new L.TileLayer("http://localhost:9001/maptilecache/ofm/{s}/{z}/{y}/{x}/?path=2207/aero/latest", {
-            maxZoom: 18,
-            minZoom: 2,
-            tileSize: map_resolution.tile_size,
-            zoomOffset: map_resolution.zoom_offset,
-            format: "image/png"
-        });
-
-        const ofmc2207uc = new L.TileLayer("https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=2207/aero/latest", {
-            maxZoom: 18,
-            minZoom: 2,
-            tileSize: map_resolution.tile_size,
-            zoomOffset: map_resolution.zoom_offset,
-            format: "image/png"
-        });
-        
         const map = new L.Map("map", {
             layers: [ osmc, oaipc_airports ],
             center: [50, 10],
@@ -135,10 +110,7 @@
         const overlayMaps = {
             "openAIP airports Cached": oaipc_airports,
             "openAIP airspaces Cached": oaipc_airspaces,
-            "openAIP airspaces": oaipc_airspaces_uncached,
-            "OFM Cached (2206)": ofmc2206,
-            "OFM Cached (2207)": ofmc2207,
-            "OFM Cached (2207) uncached": ofmc2207uc
+            "openAIP navaids Cached": oaipc_navaids,
         };
 
         L.control.layers(baseMaps, overlayMaps).addTo(map);

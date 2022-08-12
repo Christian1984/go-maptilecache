@@ -101,12 +101,14 @@ func New(config CacheConfig) (*Cache, error) {
 		return &c, errors.New("could not initialize cache, reason: route invalid, must have at least one entry")
 	}
 
-	http.HandleFunc("/"+routeString+"/", c.serve)
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/"+routeString+"/", c.serve)
+	go http.ListenAndServe("localhost:"+c.Port, serverMux)
 
 	c.InitLogStatsRunner()
 
 	duration := time.Since(start)
-	c.logInfo("New Cache initialized on route /" + routeString + "/ (took " + duration.String() + ")")
+	c.logInfo("New Cache initialized on http://localhost:" + c.Port + "/" + routeString + "/ (took " + duration.String() + ")")
 
 	return &c, nil
 
@@ -495,9 +497,9 @@ func (c *Cache) serve(w http.ResponseWriter, req *http.Request) {
 
 	c.logDebug(requestIdPrefix + "Received request with RequestURI [" + req.RequestURI + "]")
 
-	c.logDebug(requestIdPrefix + "Enter Sleep")
-	time.Sleep(3 * time.Second)
-	c.logDebug(requestIdPrefix + "Sleep done!")
+	// c.logDebug(requestIdPrefix + "Enter Sleep")
+	// time.Sleep(3 * time.Second)
+	// c.logDebug(requestIdPrefix + "Sleep done!")
 
 	requestPath := strings.Split(req.URL.Path, "/")
 
