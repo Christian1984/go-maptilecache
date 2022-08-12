@@ -76,6 +76,7 @@ func main() {
 	// var sharedMemoryCache *maptilecache.SharedMemoryCache = nil
 
 	osmCacheConfig := maptilecache.CacheConfig{
+		Host:              "localhost",
 		Port:              "9002",
 		Route:             []string{"maptilecache", "osm"},
 		UrlScheme:         "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -96,6 +97,7 @@ func main() {
 	}
 
 	otmCacheConfig := maptilecache.CacheConfig{
+		Host:              "localhost",
 		Port:              "9003",
 		Route:             []string{"maptilecache", "otm"},
 		UrlScheme:         "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
@@ -116,6 +118,7 @@ func main() {
 	}
 
 	oaipAirportsCacheConfig := maptilecache.CacheConfig{
+		Host:              "localhost",
 		Port:              "9004",
 		Route:             []string{"maptilecache", "oaip-airports"},
 		UrlScheme:         "https://api.tiles.openaip.net/api/data/airports/{z}/{x}/{y}.png?apiKey={apiKey}",
@@ -132,6 +135,7 @@ func main() {
 	maptilecache.New(oaipAirportsCacheConfig)
 
 	oaipAirspacesCacheConfig := maptilecache.CacheConfig{
+		Host:              "localhost",
 		Port:              "9005",
 		Route:             []string{"maptilecache", "oaip-airspaces"},
 		UrlScheme:         "https://api.tiles.openaip.net/api/data/airspaces/{z}/{x}/{y}.png?apiKey={apiKey}",
@@ -148,6 +152,7 @@ func main() {
 	maptilecache.New(oaipAirspacesCacheConfig)
 
 	oaipNavaidsCacheConfig := maptilecache.CacheConfig{
+		Host:              "localhost",
 		Port:              "9006",
 		Route:             []string{"maptilecache", "oaip-navaids"},
 		UrlScheme:         "https://api.tiles.openaip.net/api/data/navaids/{z}/{x}/{y}.png?apiKey={apiKey}",
