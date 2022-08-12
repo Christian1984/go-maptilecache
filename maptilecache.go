@@ -32,6 +32,7 @@ type CacheStats struct {
 }
 
 type Cache struct {
+	Host            string
 	Port            string
 	Route           []string
 	RouteString     string
@@ -47,6 +48,7 @@ type Cache struct {
 }
 
 type CacheConfig struct {
+	Host              string
 	Port              string
 	Route             []string
 	UrlScheme         string
@@ -75,6 +77,7 @@ func New(config CacheConfig) (*Cache, error) {
 	}
 
 	c := Cache{
+		Host:            config.Host,
 		Port:            config.Port,
 		Route:           config.Route,
 		RouteString:     routeString,
@@ -101,14 +104,19 @@ func New(config CacheConfig) (*Cache, error) {
 		return &c, errors.New("could not initialize cache, reason: route invalid, must have at least one entry")
 	}
 
+	if strings.TrimSpace(c.Host) == "" || strings.TrimSpace(c.Port) == "" {
+		return &c, errors.New("could not initialize cache, reason: host and/or port not defined")
+	}
+
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc("/"+routeString+"/", c.serve)
-	go http.ListenAndServe("localhost:"+c.Port, serverMux)
+	host := c.Host + ":" + c.Port
+	go http.ListenAndServe(host, serverMux)
 
 	c.InitLogStatsRunner()
 
 	duration := time.Since(start)
-	c.logInfo("New Cache initialized on http://localhost:" + c.Port + "/" + routeString + "/ (took " + duration.String() + ")")
+	c.logInfo("New Cache initialized on " + host + "/" + routeString + "/ (took " + duration.String() + ")")
 
 	return &c, nil
 
